@@ -382,7 +382,7 @@ class SwarmController(QObject):
                 )
 
         #### Printout ##############################################
-        self.env.render()
+        #self.env.render()
 
     def start_simulation(self):
         self.simulation_timer.start(CONTROL_RATE)

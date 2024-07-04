@@ -100,7 +100,6 @@ class OscSwarmController(SwarmController):
         self.simulation_timer.stop()
         self.data_send_timer.stop()
 
-
 if __name__ == "__main__":
     from PyQt6.QtWidgets import QApplication
     from PyQt6.QtCore import QTimer
