@@ -24,7 +24,7 @@ SET_DRONE_TARGET = "/set_drone_target"
 
 ###
 # OSC address for setting target to entire fleet
-# parameters: vx, vy, vz
+# parameters: x, y, z
 # x, y, z: target position in world coordinates
 # example: /set_fleet_target [0.693993, 0.7510582, 0.0974944]
 ###
