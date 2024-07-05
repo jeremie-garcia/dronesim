@@ -45,6 +45,7 @@ case.mode = 'fancy'
 case.building_detection_threshold = 5
 set_new_attribute(case, 'source_strength', 3)
 target_speed = 2
+FPV_speed = 4
 set_new_attribute(case, 'max_speed', target_speed)
 
 
@@ -64,12 +65,13 @@ class SwarmController(QObject):
         self.neighbourhood_radius = 4
         self.formation_2D = False
 
-        self.target = case.vehicle_list[0].goal
+        self.targets = [case.vehicle_list[i].goal for i in range(self.NB_OF_DRONES)]
 
         self.velocities = {i: {'vx': 0, 'vy': 0, 'vz': 0} for i in range(self.NB_OF_DRONES)}
         self.droneFPVIndex = -1
         self.forwardFrameCounter = 0
         self.stopFrameCounter = 0
+        self.actionStrength = 1
 
         self.rotation = [0.0 for i in range(self.NB_OF_DRONES)]
 
@@ -303,8 +305,9 @@ class SwarmController(QObject):
 
         obs, reward, done, info = self.env.step(self.action)
 
-        for vehicle in case.vehicle_list:  ## Update the target of the drones in case user sent a new target
-            vehicle.goal = self.target
+        for i in range(self.NB_OF_DRONES):  ## Update the target of the drones in case user sent a new target
+            vehicle = case.vehicle_list[i]
+            vehicle.goal=self.targets[i]
 
         for j in range(self.NB_OF_DRONES):
             position = [self.env.pos[j, 0], self.env.pos[j, 1], self.env.pos[j, 2]]
@@ -317,46 +320,13 @@ class SwarmController(QObject):
         #### Compute control for the current way point #############
         for j in range(self.env.NUM_DRONES):
 
-            # if the drone doesn't move for a few frames, forwardFrameCounter (handles acceleration of the drone if going forward continuously) is reset
-            if (self.velocities[j]['vx'] == 0 and self.velocities[j]['vy'] == 0 and self.velocities[j]['vz'] == 0):
-                self.stopFrameCounter += 1
-            if (self.stopFrameCounter > 10):
-                self.forwardFrameCounter = 0
-                self.stopFrameCounter = 0
-
-            # if the drone is controlled in FPV, target velocities and rotations are those received by OSC instead of PGFlow
-            if (j == self.droneFPVIndex): 
-                desired_vector = np.array([self.velocities[j]['vx'], self.velocities[j]['vy'], self.velocities[j]['vz']])
-                acceleration = (1 + self.forwardFrameCounter / 20)
-                self.action[str(j)], _, _ = self.ctrl[j].computeControlFromState(
-                    control_timestep=self.CTRL_EVERY_N_STEPS * self.env.TIMESTEP,
-                    state=obs[str(j)]["state"],
-                    target_pos = np.hstack([obs[str(j)]["state"][:2], obs[str(j)]["state"][2]]),
-                    target_vel=desired_vector*target_speed*acceleration,
-                    # target_acc=np.zeros(3),
-                    target_rpy=self.rotation[j]*np.array([0,0,1])
-                    # target_rpy_rates=np.zeros(3)
-                )
-                self.velocities[j] = {'vx': 0, 'vy': 0, 'vz': 0}
-
-            # for the rest of the drones, the target velocities and rotations are those computed by PGFlow
-            else:
-                vehicle = case.vehicle_list[j]
-                # if vehicle.state==1:
-                #     desired_vector = np.array([0,0,-1])
-                # else:
-                desired_vector = vehicle.desired_vectors[-1]
-                desired_vector = np.hstack([desired_vector, 0])
-
             if j == self.droneFPVIndex:  ##### if the drone is controlled in FPV, target velocities and rotations are those received by OSC instead of PGFlow
-                desired_vector = np.array(
-                    [self.velocities[j]['vx'], self.velocities[j]['vy'], self.velocities[j]['vz']])
-                acceleration = (1 + self.forwardFrameCounter / 20)
+                desired_vector = np.array([self.velocities[j]['vx'], self.velocities[j]['vy'], self.velocities[j]['vz']])
                 self.action[str(j)], _, _ = self.ctrl[j].computeControlFromState(
                     control_timestep=self.CTRL_EVERY_N_STEPS * self.env.TIMESTEP,
                     state=obs[str(j)]["state"],
                     target_pos=np.hstack([obs[str(j)]["state"][:2], obs[str(j)]["state"][2]]),
-                    target_vel=desired_vector * target_speed * acceleration,
+                    target_vel=desired_vector * FPV_speed * self.actionStrength,
                     # target_acc=np.zeros(3),
                     target_rpy=self.rotation[j] * np.array([0, 0, 1])
                     # target_rpy_rates=np.zeros(3)
@@ -382,7 +352,7 @@ class SwarmController(QObject):
                 )
 
         #### Printout ##############################################
-        #self.env.render()
+        # self.env.render()
 
     def start_simulation(self):
         self.simulation_timer.start(CONTROL_RATE)

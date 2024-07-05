@@ -4,7 +4,7 @@ import osc_protocol
 from OSCServer import OSCServer, OSCThread
 from swarmcontroller import SwarmController
 
-VR_HEADSET = False
+VR_HEADSET = True
 if VR_HEADSET:
     OSC_CLIENT_IP = "10.1.124.77"
 else:
@@ -49,20 +49,14 @@ class OscSwarmController(SwarmController):
         parts = addr.split('/')
         print(f"addr: {addr}, parts: {parts}, data: {data}")
 
-        if len(parts) == 4 and parts[1] == 'drone' and parts[2] in ['vx', 'vy', 'vz']:
-            axis = parts[2]
-            id_drone = int(parts[3])
-            if id_drone != -1:
-                self.velocities[id_drone][axis] = float(data)
-                self.droneFPVIndex = id_drone
+        if addr == osc_protocol.SET_DRONE_VELOCITIES:
+            self.set_drone_velocities(data)
 
-        elif len(parts) == 4 and parts[2] == 'target':
-            coordinates = parts[3].split(',')
-            xtarget = float(coordinates[0])
-            ztarget = float(coordinates[1])
-            ytarget = float(coordinates[2])
-            self.target = [xtarget, ytarget, ztarget]
-            print("new target: ", xtarget, ytarget, ztarget)
+        elif addr == osc_protocol.SET_FLEET_TARGET:
+            self.set_fleet_targets(data)
+
+        if addr == osc_protocol.SET_DRONE_TARGET:
+            self.set_drone_target(data)
 
         elif len(parts) == 4 and parts[2] == 'rotate':
             id_drone = int(parts[3])
@@ -72,14 +66,46 @@ class OscSwarmController(SwarmController):
                 elif float(data) == -1:
                     self.rotation[id_drone] += 0.03
 
-        elif addr == osc_protocol.FORWARD:  # command meant to indicate that the drone is moving forward so that it
+        elif addr == osc_protocol.FORWARDtoremove:  # command meant to indicate that the drone is moving forward so that it
             # accelerates
             if self.forwardFrameCounter < 140:
                 self.forwardFrameCounter += 1
             self.stopFrameCounter = 0
 
-        elif addr == osc_protocol.RESET:  # command sent when the user quits FPV on the current selected drone
+        elif addr == osc_protocol.EXIT_FPV_MODE:  # command sent when the user quits FPV on the current selected drone
             self.droneFPVIndex = -1
+
+    def set_fleet_targets(self, data_string):
+        data = self.to_array(data_string)
+        xtarget = float(data[0])
+        ztarget = float(data[1])
+        ytarget = float(data[2])
+        for i in range (self.NB_OF_DRONES):    
+            self.targets[i] = [xtarget, ytarget, ztarget]
+        print("new target for fleet: ", xtarget, ytarget, ztarget)
+
+    def set_drone_target(self, data_string):
+        data = self.to_array(data_string)
+        drone_id = int(data[0])
+        xtarget = float(data[1])
+        ztarget = float(data[2])
+        ytarget = float(data[3])
+        self.targets[drone_id] = [xtarget, ytarget, ztarget]
+        print("new target for drone", drone_id, ": ", xtarget, ytarget, ztarget)
+
+    def set_drone_velocities(self, data_string):       # TODO: check if this is correct
+        data = self.to_array(data_string)
+        id_drone = int(data[0])
+        if id_drone != -1:
+            self.velocities[id_drone]['vx'] = float(data[1])
+            self.velocities[id_drone]['vz'] = float(data[2])
+            self.velocities[id_drone]['vy'] = float(data[3])
+            self.droneFPVIndex = id_drone
+        self.actionStrength = float(data[4])
+
+    def to_array(self, data):
+        data = data[1:-1]
+        return data.split(',')
 
     # Method to start the OSC server
     def start_osc_server(self):
