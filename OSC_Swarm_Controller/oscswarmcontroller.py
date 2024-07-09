@@ -46,34 +46,41 @@ class OscSwarmController(SwarmController):
 
     # Method to handle incoming OSC data
     def handle_osc_data(self, addr, data):
-        parts = addr.split('/')
-        print(f"addr: {addr}, parts: {parts}, data: {data}")
 
         if addr == osc_protocol.SET_DRONE_VELOCITIES:
             self.set_drone_velocities(data)
 
-        elif addr == osc_protocol.SET_FLEET_TARGET:
-            self.set_fleet_targets(data)
+        elif addr == osc_protocol.SET_DRONE_ROTATION:
+            self.set_drone_rotation(data)
 
         if addr == osc_protocol.SET_DRONE_TARGET:
             self.set_drone_target(data)
-
-        elif len(parts) == 4 and parts[2] == 'rotate':
-            id_drone = int(parts[3])
-            if id_drone != -1:
-                if float(data) == 1:
-                    self.rotation[id_drone] -= 0.03
-                elif float(data) == -1:
-                    self.rotation[id_drone] += 0.03
-
-        elif addr == osc_protocol.FORWARDtoremove:  # command meant to indicate that the drone is moving forward so that it
-            # accelerates
-            if self.forwardFrameCounter < 140:
-                self.forwardFrameCounter += 1
-            self.stopFrameCounter = 0
+        
+        elif addr == osc_protocol.SET_FLEET_TARGET:
+            self.set_fleet_targets(data)
 
         elif addr == osc_protocol.EXIT_FPV_MODE:  # command sent when the user quits FPV on the current selected drone
             self.droneFPVIndex = -1
+
+    def set_drone_velocities(self, data_string):
+        data = self.to_array(data_string)
+        id_drone = int(data[0])
+        if id_drone != -1:
+            self.velocities[id_drone]['vx'] = float(data[1])
+            self.velocities[id_drone]['vz'] = float(data[2])
+            self.velocities[id_drone]['vy'] = float(data[3])
+            self.droneFPVIndex = id_drone
+        self.actionStrength = float(data[4])
+
+    def set_drone_rotation(self, data_string):
+        data = self.to_array(data_string)
+        drone_id = int(data[0])
+        direction = float(data[1])
+        rotationStrength = float(data[2])
+        if direction == 1:
+            self.rotation[drone_id] -= 0.03 * rotationStrength
+        elif direction == -1:
+            self.rotation[drone_id] += 0.03 * rotationStrength
 
     def set_fleet_targets(self, data_string):
         data = self.to_array(data_string)
@@ -92,16 +99,6 @@ class OscSwarmController(SwarmController):
         ytarget = float(data[3])
         self.targets[drone_id] = [xtarget, ytarget, ztarget]
         print("new target for drone", drone_id, ": ", xtarget, ytarget, ztarget)
-
-    def set_drone_velocities(self, data_string):       # TODO: check if this is correct
-        data = self.to_array(data_string)
-        id_drone = int(data[0])
-        if id_drone != -1:
-            self.velocities[id_drone]['vx'] = float(data[1])
-            self.velocities[id_drone]['vz'] = float(data[2])
-            self.velocities[id_drone]['vy'] = float(data[3])
-            self.droneFPVIndex = id_drone
-        self.actionStrength = float(data[4])
 
     def to_array(self, data):
         data = data[1:-1]
