@@ -6,18 +6,20 @@ from swarmcontroller import SwarmController
 
 VR_HEADSET = True
 if VR_HEADSET:
-    OSC_CLIENT_IP = "10.1.124.77"
+    # OSC_CLIENT_IP = "10.1.124.77" # ENAC_AUTH
+    # OSC_CLIENT_IP = "192.168.1.102" # LII_AP_NO_INTERNET
+    OSC_CLIENT_IP = "192.168.43.76" # Huawei P Smart Z
 else:
     OSC_CLIENT_IP = "127.0.0.1"
 
 OSC_SERVER_IP = "0.0.0.0"
 OSC_SWARM_CONTROLLER_PORT = 3000
 OSC_REMOTE_CONTROLLER_PORT = 3001
-OSC_SEND_FREQ = 180  # in Hz
+OSC_SEND_FREQ = 60  # in Hz
 OSC_SEND_RATE = int(1000 / OSC_SEND_FREQ)  # in ms
 OSC_SIMULATION_STEPS_TO_SEND = 10  # number of control steps to send data
 
-
+#### Class that inherits from SwarmController (Handles drones simulation) and adds OSC messages handling ####
 class OscSwarmController(SwarmController):
 
     def __init__(self):
@@ -39,6 +41,8 @@ class OscSwarmController(SwarmController):
 
         # start thread for sending osc messages
         self.data_send_timer.start(OSC_SEND_RATE)
+
+        self.send_num_drones_via_osc()
 
     def send_osc(self, address, args):
         self.osc_client.send_message(address, args)
@@ -62,6 +66,7 @@ class OscSwarmController(SwarmController):
         elif addr == osc_protocol.EXIT_FPV_MODE:  # command sent when the user quits FPV on the current selected drone
             self.droneFPVIndex = -1
 
+    # function that updates velocities with the values sent by the user, see osc_protocol.py to know what it should take as arguments
     def set_drone_velocities(self, data_string):
         data = self.to_array(data_string)
         id_drone = int(data[0])
@@ -118,6 +123,9 @@ class OscSwarmController(SwarmController):
                                                          self.env.rpy[i, 0],
                                                          self.env.rpy[i, 1],
                                                          self.env.rpy[i, 2]])
+            
+    def send_num_drones_via_osc(self):
+        self.send_osc(osc_protocol.SEND_NUM_DRONES, [self.NB_OF_DRONES])
 
     def stop_simulation(self):
         self.simulation_timer.stop()

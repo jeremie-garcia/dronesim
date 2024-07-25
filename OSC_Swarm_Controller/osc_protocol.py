@@ -1,6 +1,9 @@
 ######### Server messages #########
 # message that the server can accept (from unity clients)
 
+###
+# OSC address to notify simulation that the user has exited FPV mode (droneFPVIndex reset to -1)
+###
 EXIT_FPV_MODE = "/reset"
 
 ###
@@ -48,9 +51,16 @@ SET_FLEET_TARGET= "/set_fleet_target"
 #  message that the server can send to unity clients
 
 ###
-# OSC addresses for sending data
+# OSC address for sending drone data
 # parameters: x, y, z , rx, ry, rz
 # x, y, z: position in meters
 # rx, ry, rz: rotation in radians
 ###
 SEND_DRONE_DATA = "/send_drone_data"
+
+###
+# OSC addresses for sending number of drones selected by the user ('--num_drones' command line argument)
+# parameters: n
+# n: number of drones
+###
+SEND_NUM_DRONES = "/send_num_drones"
