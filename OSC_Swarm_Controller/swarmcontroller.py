@@ -33,7 +33,7 @@ CONTROL_RATE = int(1000 / CONTROL_FREQ)  # in ms
 # at the moment, only convex buildings are supported for plotting
 filename = 'VerticesData.json'  # case name from scenebuilder
 ArenaMap.size = 0.4 # panel size; basically more panels means better precision but more calculation, this number can be lowered to 5 panels by building so for a 3x3 building, size=0.6 max.
-ArenaMap.inflation_radius = 0.1 # buildings are bigger in the simulation so that vehicles turn earlier in anticipation
+ArenaMap.inflation_radius = 1.0 # buildings are bigger in the simulation so that vehicles turn earlier in anticipation
 case = Cases.get_case(filename, 'scenebuilder')
 # Load polygons from the text file
 with open(filename, "r") as f:
@@ -355,12 +355,12 @@ class SwarmController(QObject):
             vehicle = case.vehicle_list[i]
             vehicle.goal=self.targets[i]
 
-        for j in range(self.NB_OF_DRONES):
-            position = [self.env.pos[j, 0], self.env.pos[j, 1], self.env.pos[j, 2]]
-            rotation = [self.env.rpy[j, 0], self.env.rpy[j, 1], self.env.rpy[j, 2]]
-            # print(f"{obs[str(j)]["state"]}")
-            pos = obs[str(j)]["state"][:3]
-            case.vehicle_list[j].position = pos
+        if self.droneFPVIndex == -1:
+            for j in range(self.NB_OF_DRONES):
+                self.rotation[j] = self.env.rpy[j, 2]
+                # print(f"{obs[str(j)]["state"]}")
+                pos = obs[str(j)]["state"][:3]
+                case.vehicle_list[j].position = pos
 
         # calculate time for step_simulation and print average after 500 frames  
         time_before_step_simulation = time.time()
