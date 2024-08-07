@@ -6,6 +6,7 @@
 ###
 EXIT_FPV_MODE = "/reset"
 
+
 ###
 # OSC address for setting drone velocities
 # parameters: id, vx, vy, vz, actionStrength
@@ -42,6 +43,21 @@ SET_DRONE_TARGET = "/set_drone_target"
 # example: /set_fleet_target [0.7510582, 0.0974944, 0.781640]
 ###
 SET_FLEET_TARGET= "/set_fleet_target"
+
+###
+# OSC address for setting target mode
+# parameters: mode
+# mode: integer value representing the target mode, 0 for fleet, 1 for individual
+# example: /set_target_mode 0
+###
+SET_TARGET_MODE= "/set_target_mode"
+
+###
+# OSC address for resetting drone targets
+# parameters: none
+###
+RESET_TARGETS = "/reset_targets"
+
 
 
 

@@ -4,7 +4,7 @@ import osc_protocol
 from OSCServer import OSCServer, OSCThread
 from swarmcontroller import SwarmController
 
-VR_HEADSET = True
+VR_HEADSET = True # set to True if using VR headset, False if using desktop version
 if VR_HEADSET:
     # OSC_CLIENT_IP = "10.1.124.77" # ENAC_AUTH
     # OSC_CLIENT_IP = "192.168.1.102" # LII_AP_NO_INTERNET
@@ -61,7 +61,13 @@ class OscSwarmController(SwarmController):
             self.set_drone_target(data)
         
         elif addr == osc_protocol.SET_FLEET_TARGET:
-            self.set_fleet_targets(data)
+            self.set_fleet_target(data)
+
+        elif addr == osc_protocol.SET_TARGET_MODE:
+            self.set_target_mode(data)
+
+        elif addr == osc_protocol.RESET_TARGETS:
+            self.reset_targets(data)
 
         elif addr == osc_protocol.EXIT_FPV_MODE:  # command sent when the user quits FPV on the current selected drone
             self.droneFPVIndex = -1
@@ -87,13 +93,15 @@ class OscSwarmController(SwarmController):
         elif direction == -1:
             self.rotation[drone_id] += 0.03 * rotationStrength
 
-    def set_fleet_targets(self, data_string):
+    def set_fleet_target(self, data_string):
         data = self.to_array(data_string)
         xtarget = float(data[0])
         ztarget = float(data[1])
         ytarget = float(data[2])
-        for i in range (self.NB_OF_DRONES):    
-            self.targets[i] = [xtarget, ytarget, ztarget]
+        for i in range (self.NB_OF_DRONES):
+            self.old_fleet_target = self.fleet_target    
+            self.fleet_target = [xtarget, ytarget, ztarget]
+            if self.target_mode == 0: self.vehicle_list[i].state=0
         print("new target for fleet: ", xtarget, ytarget, ztarget)
 
     def set_drone_target(self, data_string):
@@ -102,8 +110,23 @@ class OscSwarmController(SwarmController):
         xtarget = float(data[1])
         ztarget = float(data[2])
         ytarget = float(data[3])
-        self.targets[drone_id] = [xtarget, ytarget, ztarget]
+        self.drone_targets[drone_id] = [xtarget, ytarget, ztarget]
+        if self.target_mode == 1: self.vehicle_list[drone_id].state=0
         print("new target for drone", drone_id, ": ", xtarget, ytarget, ztarget)
+
+    def set_target_mode(self, data):
+        mode = int(data[0])
+        self.target_mode = mode
+        for i in range(self.NB_OF_DRONES):
+            if (mode == 0 and self.is_fleet_target_set()) or (mode == 1 and self.is_individual_target_set(i)):
+                self.vehicle_list[i].state=0
+        print("new target mode: ", mode)
+
+    def reset_targets(self, data):
+        for i in range(self.NB_OF_DRONES):
+            self.drone_targets[i] = self.initial_drone_targets[i]
+        self.fleet_target = self.initial_fleet_target
+        print("targets reset")
 
     def to_array(self, data):
         data = data[1:-1]

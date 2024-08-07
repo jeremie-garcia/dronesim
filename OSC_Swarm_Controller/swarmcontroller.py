@@ -33,7 +33,7 @@ CONTROL_RATE = int(1000 / CONTROL_FREQ)  # in ms
 # at the moment, only convex buildings are supported for plotting
 filename = 'VerticesData.json'  # case name from scenebuilder
 ArenaMap.size = 0.4 # panel size; basically more panels means better precision but more calculation, this number can be lowered to 5 panels by building so for a 3x3 building, size=0.6 max.
-ArenaMap.inflation_radius = 1.0 # buildings are bigger in the simulation so that vehicles turn earlier in anticipation
+ArenaMap.inflation_radius = 0.1 # buildings are bigger in the simulation so that vehicles turn earlier in anticipation
 case = Cases.get_case(filename, 'scenebuilder')
 # Load polygons from the text file
 with open(filename, "r") as f:
@@ -41,6 +41,8 @@ with open(filename, "r") as f:
     data = json.load(f)
 
 num_drones = len(case.vehicle_list)
+for i in range(num_drones):
+    case.vehicle_list[i].position = np.array([i % 5, int(i/5), 0])
 NB_OF_DRONES = num_drones
 case.mode = '' # keeping this to none is the best option speed-wise, others increase precision but take longer
 
@@ -71,11 +73,13 @@ class SwarmController(QObject):
         
         self.env = None
         self.NB_OF_DRONES = NB_OF_DRONES
+        self.vehicle_list = case.vehicle_list
 
-        self.neighbourhood_radius = 4
-        self.formation_2D = False
-
-        self.targets = [case.vehicle_list[i].goal for i in range(self.NB_OF_DRONES)]
+        self.target_mode = 0 # 0 for fleet, 1 for individual
+        self.drone_targets = [np.zeros(3) for i in range(self.NB_OF_DRONES)]
+        self.fleet_target = np.zeros(3)
+        self.initial_drone_targets = self.drone_targets
+        self.initial_fleet_target = self.fleet_target
 
         self.velocities = {i: {'vx': 0, 'vy': 0, 'vz': 0} for i in range(self.NB_OF_DRONES)}
         self.droneFPVIndex = -1
@@ -236,7 +240,7 @@ class SwarmController(QObject):
         # myVehicle.Set_Goal(goal=goal, goal_strength=sink_strength)
         # myVehicle.set_initial_position(position)
 
-        if ARGS.num_drones > len(case.vehicle_list):
+        if ARGS.num_drones > len(case.vehicle_list):       # if user wants more than 5 drones, we create as many new drones as needed and add them to the vehicle_list
             while len(case.vehicle_list) < ARGS.num_drones:
                 n = len(case.vehicle_list)
                 newvehicle = vehicle.Vehicle(source_strength=3, imag_source_strength=0)
@@ -246,7 +250,9 @@ class SwarmController(QObject):
                 newvehicle.personal_vehicle_dict = case.vehicle_list[0].personal_vehicle_dict
                 newvehicle.arena = case.arena
                 case.vehicle_list.append(newvehicle)
-            self.targets = [case.vehicle_list[i].goal for i in range(self.NB_OF_DRONES)]
+                self.vehicle_list = case.vehicle_list
+            self.drone_targets = [np.zeros(3) for i in range(self.NB_OF_DRONES)]
+            self.initial_drone_targets = [np.zeros(3) for i in range(self.NB_OF_DRONES)]
             self.velocities = {i: {'vx': 0, 'vy': 0, 'vz': 0} for i in range(self.NB_OF_DRONES)}
             self.rotation = [0.0 for i in range(self.NB_OF_DRONES)]
             self.action = {
@@ -254,8 +260,9 @@ class SwarmController(QObject):
             }
         # case.to_json()
 
-        if ARGS.num_drones < len(case.vehicle_list):
+        if ARGS.num_drones < len(case.vehicle_list):      # if user wants less than 5 drones (number of drones currently in the json file), we just forget the ones left
             case.vehicle_list = case.vehicle_list[:ARGS.num_drones]
+            self.vehicle_list = case.vehicle_list
 
         AGGR_PHY_STEPS = (
             int(ARGS.simulation_freq_hz / ARGS.control_freq_hz) if ARGS.aggregate else 1
@@ -273,6 +280,8 @@ class SwarmController(QObject):
         INIT_XYZS = np.array([v.position for v in case.vehicle_list])
         INIT_RPYS = np.array([[0.0, 0.0, 0.0] for i in range(ARGS.num_drones)])
         INIT_VELS = np.array([[0.0, 0.0, 0.0] for _ in range(ARGS.num_drones)])
+        for v in case.vehicle_list:
+            v.state = 1
 
         #### Initialize a circular trajectory ######################
         PERIOD = 15
@@ -353,7 +362,13 @@ class SwarmController(QObject):
 
         for i in range(self.NB_OF_DRONES):  ## Update the target of the drones in case user sent a new target
             vehicle = case.vehicle_list[i]
-            vehicle.goal=self.targets[i]
+            if self.target_mode == 1 and self.is_individual_target_set(i):
+                vehicle.goal = self.drone_targets[i]
+            elif self.target_mode == 0 and self.is_fleet_target_set():
+                vehicle.goal = self.fleet_target
+            else:    
+                vehicle.state=1
+        case.vehicle_list = self.vehicle_list
 
         if self.droneFPVIndex == -1:
             for j in range(self.NB_OF_DRONES):
@@ -413,6 +428,12 @@ class SwarmController(QObject):
 
         #### Printout ##############################################
         # self.env.render()
+
+    def is_individual_target_set(self, i):
+        return np.any(self.drone_targets[i])
+    
+    def is_fleet_target_set(self):
+        return np.any(self.fleet_target)
 
     def start_simulation(self):
         self.simulation_timer.start(CONTROL_RATE)
