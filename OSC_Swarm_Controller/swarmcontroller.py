@@ -42,7 +42,7 @@ with open(filename, "r") as f:
 
 num_drones = len(case.vehicle_list)
 for i in range(num_drones):
-    case.vehicle_list[i].position = np.array([i % 5, int(i/5), 0])
+    case.vehicle_list[i].position = np.array([i % 10, int(i/10), 0])
 NB_OF_DRONES = num_drones
 case.mode = '' # keeping this to none is the best option speed-wise, others increase precision but take longer
 
@@ -244,7 +244,7 @@ class SwarmController(QObject):
             while len(case.vehicle_list) < ARGS.num_drones:
                 n = len(case.vehicle_list)
                 newvehicle = vehicle.Vehicle(source_strength=3, imag_source_strength=0)
-                newvehicle.position = np.array([n % 5, int(n/5), 0])
+                newvehicle.position = np.array([n % 10, int(n/10), 0])
                 newvehicle.goal = case.vehicle_list[0].goal
                 newvehicle.ID = "Drone "+str(n+1)
                 newvehicle.personal_vehicle_dict = case.vehicle_list[0].personal_vehicle_dict
