@@ -1,14 +1,21 @@
 from pythonosc.udp_client import SimpleUDPClient
 
+import argparse
+
 import osc_protocol
 from OSCServer import OSCServer, OSCThread
 from swarmcontroller import SwarmController
 
-VR_HEADSET = True # set to True if using VR headset, False if using desktop version
-if VR_HEADSET:
-    # OSC_CLIENT_IP = "10.1.124.77" # ENAC_AUTH
-    # OSC_CLIENT_IP = "192.168.1.102" # LII_AP_NO_INTERNET
-    OSC_CLIENT_IP = "192.168.43.76" # Huawei P Smart Z
+# Configuration du parser d'arguments
+parser = argparse.ArgumentParser(description='OscSwarmController Configuration')
+
+parser.add_argument('--vr_headset', action='store_true', default=True, help='Set this flag if using a VR headset')
+parser.add_argument('--nb_drones', type=int, default=5, help='Number of drones in the simulation')
+
+args = parser.parse_args()
+
+if args.vr_headset: # Set the IP of the VR headset
+    OSC_CLIENT_IP = "10.1.124.238" # ENAC_AUTH
 else:
     OSC_CLIENT_IP = "127.0.0.1"
 
@@ -36,6 +43,8 @@ class OscSwarmController(SwarmController):
         self.data_send_timer = QTimer()
         self.data_send_timer.timeout.connect(self.send_simulation_data_via_osc)
 
+        self.nb_of_drones = args.nb_drones
+
         # init parent class with simulation and threads for scene update
         super().__init__()
 
@@ -46,10 +55,10 @@ class OscSwarmController(SwarmController):
 
     def send_osc(self, address, args):
         self.osc_client.send_message(address, args)
-        # print(f"Sent OSC message: {address} {args}")
 
     # Method to handle incoming OSC data
     def handle_osc_data(self, addr, data):
+        print("Received OSC message: ", addr, data)
 
         if addr == osc_protocol.SET_DRONE_VELOCITIES:
             self.set_drone_velocities(data)
@@ -71,6 +80,9 @@ class OscSwarmController(SwarmController):
 
         elif addr == osc_protocol.EXIT_FPV_MODE:  # command sent when the user quits FPV on the current selected drone
             self.droneFPVIndex = -1
+
+        elif addr == osc_protocol.DEBUG_MESSAGE:
+            print("Debug message: ", data)
 
     # function that updates velocities with the values sent by the user, see osc_protocol.py to know what it should take as arguments
     def set_drone_velocities(self, data_string):
@@ -98,7 +110,7 @@ class OscSwarmController(SwarmController):
         xtarget = float(data[0])
         ztarget = float(data[1])
         ytarget = float(data[2])
-        for i in range (self.NB_OF_DRONES):
+        for i in range (self.nb_of_drones):
             self.old_fleet_target = self.fleet_target    
             self.fleet_target = [xtarget, ytarget, ztarget]
             if self.target_mode == 0: self.vehicle_list[i].state=0
@@ -117,13 +129,13 @@ class OscSwarmController(SwarmController):
     def set_target_mode(self, data):
         mode = int(data[0])
         self.target_mode = mode
-        for i in range(self.NB_OF_DRONES):
+        for i in range(self.nb_of_drones):
             if (mode == 0 and self.is_fleet_target_set()) or (mode == 1 and self.is_individual_target_set(i)):
                 self.vehicle_list[i].state=0
         print("new target mode: ", mode)
 
     def reset_targets(self, data):
-        for i in range(self.NB_OF_DRONES):
+        for i in range(self.nb_of_drones):
             self.drone_targets[i] = self.initial_drone_targets[i]
         self.fleet_target = self.initial_fleet_target
         print("targets reset")
@@ -148,7 +160,7 @@ class OscSwarmController(SwarmController):
                                                          self.env.rpy[i, 2]])
             
     def send_num_drones_via_osc(self):
-        self.send_osc(osc_protocol.SEND_NUM_DRONES, [self.NB_OF_DRONES])
+        self.send_osc(osc_protocol.SEND_NUM_DRONES, [self.nb_of_drones])
 
     def stop_simulation(self):
         self.simulation_timer.stop()

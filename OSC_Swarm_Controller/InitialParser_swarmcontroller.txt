@@ -1,0 +1,121 @@
+ # ## Define and parse (optional) arguments for the script ##
+        # parser = argparse.ArgumentParser(
+        #     description="Helix flight script using CtrlAviary or VisionAviary and DSLPIDControl"
+        # )
+        # parser.add_argument(
+        #     "--drone",
+        #     default=["robobee"] * num_drones,  # hexa_6DOF_simple
+        #     type=list,
+        #     help="Drone model (default: CF2X)",
+        #     metavar="",
+        #     choices=[DroneModel],
+        # )
+        # parser.add_argument(
+        #     "--num_drones",
+        #     default=self.NB_OF_DRONES,
+        #     type=int,
+        #     help="Number of drones (default: 3)",
+        #     metavar="",
+        # )
+        # parser.add_argument(
+        #     "--physics",
+        #     default="pyb",
+        #     type=Physics,
+        #     help="Physics updates (default: PYB)",
+        #     metavar="",
+        #     choices=Physics,
+        # )
+        # parser.add_argument(
+        #     "--vision",
+        #     default=False,
+        #     type=str2bool,
+        #     help="Whether to use VisionAviary (default: False)",
+        #     metavar="",
+        # )
+        # parser.add_argument(
+        #     "--gui",
+        #     default=True,
+        #     type=str2bool,
+        #     help="Whether to use PyBullet GUI (default: True)",
+        #     metavar="",
+        # )
+        # parser.add_argument(
+        #     "--record_video",
+        #     default=False,
+        #     type=str2bool,
+        #     help="Whether to record a video (default: False)",
+        #     metavar="",
+        # )
+        # parser.add_argument(
+        #     "--plot",
+        #     default=False,
+        #     type=str2bool,
+        #     help="Whether to plot the simulation results (default: True)",
+        #     metavar="",
+        # )
+        # parser.add_argument(
+        #     "--user_debug_gui",
+        #     default=False,
+        #     type=str2bool,
+        #     help="Whether to add debug lines and parameters to the GUI (default: False)",
+        #     metavar="",
+        # )
+        # parser.add_argument(
+        #     "--aggregate",
+        #     default=True,
+        #     type=str2bool,
+        #     help="Whether to aggregate physics steps (default: True)",
+        #     metavar="",
+        # )
+        # parser.add_argument(
+        #     "--obstacles",
+        #     default=False,
+        #     type=str2bool,
+        #     help="Whether to add obstacles to the environment (default: True)",
+        #     metavar="",
+        # )
+        # parser.add_argument(
+        #     "--simulation_freq_hz",
+        #     default=240,
+        #     type=int,
+        #     help="Simulation frequency in Hz (default: 240)",
+        #     metavar="",
+        # )
+        # parser.add_argument(
+        #     "--control_freq_hz",
+        #     default=CONTROL_FREQ,
+        #     type=int,
+        #     help="Control frequency in Hz (default: 48)",
+        #     metavar="",
+        # )
+        # parser.add_argument(
+        #     "--duration_sec",
+        #     default=20000,
+        #     type=int,
+        #     help="Duration of the simulation in seconds (default: 5)",
+        #     metavar="",
+        # )
+        # parser.add_argument(
+        #     "--neighbourhood_radius",
+        #     default=2,
+        #     type=float,
+        #     help="Neighbourhood radius for the drones (default: 2)"
+        # )
+        # parser.add_argument(
+        #     "--formation_2D",
+        #     default=False,
+        #     type=str2bool,
+        #     help="Whether to use 2D formation (default: False)",
+        # )
+        # ARGS = parser.parse_args()
+
+        # if ARGS.num_drones:
+        #     self.NB_OF_DRONES = ARGS.num_drones
+        #     self.rotation = [0.0 for i in range(self.NB_OF_DRONES)]
+        #     self.drone_model = ["robobee"] * self.NB_OF_DRONES
+
+        # if ARGS.neighbourhood_radius:
+        #     self.neighbourhood_radius = ARGS.neighbourhood_radius
+
+        # if ARGS.formation_2D:
+        #     self.formation_2D = ARGS.formation_2D

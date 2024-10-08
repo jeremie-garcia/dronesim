@@ -59,6 +59,9 @@ SET_TARGET_MODE= "/set_target_mode"
 RESET_TARGETS = "/reset_targets"
 
 
+DEBUG_MESSAGE = "/debug_message"
+
+
 
 
 

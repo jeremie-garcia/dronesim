@@ -1,451 +1,301 @@
 import os
 import sys
 import time
+import json
+import argparse
 
-# Comment --> for debuging Amania Computer
+from PyQt6.QtWidgets import QApplication
+from PyQt6.QtCore import QObject, QTimer
+
+import pybullet as p
+
+# Ajuster le chemin pour inclure le package 'dronesim'
 current_dir = os.path.dirname(os.path.abspath(__file__))
 grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 dronesim_path = os.path.join(grandparent_dir, "dronesim")
 sys.path.insert(0, dronesim_path)
 
-import pybullet as p
-import json
-
-from PyQt6.QtWidgets import QApplication
-from PyQt6.QtCore import QObject, QTimer
-
-import argparse
-
 from dronesim.control.INDIControl import INDIControl
 from dronesim.envs.BaseAviary import DroneModel, Physics
-
 from dronesim.envs.CtrlAviary import CtrlAviary
-from dronesim.utils.trajGen import *
+from dronesim.utils.trajGen import *  # Considérez l'importation explicite des fonctions nécessaires
 from dronesim.utils.utils import str2bool
 
 from pgflow import Cases, vehicle
 from pgflow.arena import ArenaMap
 from pgflow.utils.simulation_utils import step_simulation, set_new_attribute
 
-CONTROL_FREQ = 30   # in HZ
-CONTROL_RATE = int(1000 / CONTROL_FREQ)  # in ms
+CONTROL_FREQ = 30  # en Hz
+CONTROL_RATE = int(1000 / CONTROL_FREQ)  # en ms
+SIMULATION_FREQ_HZ = 240
 
-# at the moment, only convex buildings are supported for plotting
-filename = 'VerticesData.json'  # case name from scenebuilder
-ArenaMap.size = 0.4 # panel size; basically more panels means better precision but more calculation, this number can be lowered to 5 panels by building so for a 3x3 building, size=0.6 max.
-ArenaMap.inflation_radius = 0.1 # buildings are bigger in the simulation so that vehicles turn earlier in anticipation
-case = Cases.get_case(filename, 'scenebuilder')
-# Load polygons from the text file
-with open(filename, "r") as f:
-    # Load the JSON data
+"""Initialisation de la simulation de l'essaim de drones."""
+FILENAME = 'VerticesData.json'  # Nom du cas depuis scenebuilder
+case = Cases.get_case(FILENAME, "scenebuilder")
+
+# Charger les polygones à partir du fichier texte
+with open(FILENAME, "r") as f:
     data = json.load(f)
 
+# Initialiser les positions des drones
 num_drones = len(case.vehicle_list)
 for i in range(num_drones):
-    case.vehicle_list[i].position = np.array([i % 10, int(i/10), 0])
-NB_OF_DRONES = num_drones
-case.mode = '' # keeping this to none is the best option speed-wise, others increase precision but take longer
+    case.vehicle_list[i].position = np.array([i % 10, int(i / 10), 0])
 
-case.building_detection_threshold = 3 # distance for drones to see buildings
-# case.max_avoidance_distance = 1.5 # distance for drones to see each other
-# set_new_attribute(case, 'imag_source_strength', 100) # building source strength, not working for now
-# set_new_attribute(case, 'ARRIVAL_DISTANCE', 2) # meters from the target for the drones to consider they arrived at their destination
-# set_new_attribute(case, 'turn_radius', 0.3) # max radius of turn
-set_new_attribute(case, 'source_strength', 1) # vehicle source strength
-# set_new_attribute(case, 'goal', np.array([14.06, -8.23, 0]))
-target_speed = 2 # m/s 
-FPV_speed = 4 # max speed higher just so FPV is not too boring
-set_new_attribute(case, 'max_speed', target_speed) # max speed for the drones
+# Paramètres de la carte et buildings
+ArenaMap.size = 0.5  # Taille du panneau; plus il y a de panneaux, meilleure est la précision mais plus le calcul est important
+ArenaMap.inflation_radius = 0.3  # Les sources sont éloignés des bâtiments pour plus d'anticipation (penser a rajouter des panneaux dans ce cas)
 
-# here for performance debug, prints every 500 frames time taken by one step of pgflow
-frameIndex = 0 
-time_taken_pgflow = [0]*500
+
+case.mode = ''  # Le garder à 'none' est la meilleure option en termes de vitesse / autre mode 'fancy' pour l'anticipation des drones
+case.building_detection_threshold = 4  # Distance pour que les drones voient les bâtiments (impact sur les performances) / conseil : 4
+case.max_avoidance_distance = 4  # Distance pour que les drones se voient entre eux (impact sur les performances) / conseil : 4
+set_new_attribute(case, 'source_strength', 1)  # Force de la source du véhicule (pas d'impact sur les performances)
+
+TARGET_SPEED = 2  # en m/s
+FPV_SPEED = 4  # Vitesse maximale plus élevée pour le FPV
+set_new_attribute(case, 'max_speed', TARGET_SPEED)  # Vitesse maximale pour les drones (pas d'impact sur les performances)
+
+# Pour le débogage des performances, imprime tous les 500 frames le temps pris par une étape de pgflow
+frame_index = 0
+time_taken_pgflow = [0] * 500
+
+
+
 
 class SwarmController(QObject):
+    """Contrôleur pour un essaim de drones."""
 
     def __init__(self):
         super().__init__()
 
-        self.ARGS = None
-
-        print("OSC server started")
+        print("Serveur OSC démarré")
         sys.stdout.flush()
-        
+
         self.env = None
-        self.NB_OF_DRONES = NB_OF_DRONES
+        #self.nb_of_drones = 5
         self.vehicle_list = case.vehicle_list
 
-        self.target_mode = 0 # 0 for fleet, 1 for individual
-        self.drone_targets = [np.zeros(3) for i in range(self.NB_OF_DRONES)]
+        self.target_mode = 0  # 0 pour la flotte, 1 pour individuel
+        self.drone_targets = [np.zeros(3) for _ in range(self.nb_of_drones)]
         self.fleet_target = np.zeros(3)
-        self.initial_drone_targets = self.drone_targets
-        self.initial_fleet_target = self.fleet_target
+        self.initial_drone_targets = self.drone_targets.copy()
+        self.initial_fleet_target = self.fleet_target.copy()
 
-        self.velocities = {i: {'vx': 0, 'vy': 0, 'vz': 0} for i in range(self.NB_OF_DRONES)}
-        self.droneFPVIndex = -1
-        self.forwardFrameCounter = 0
-        self.stopFrameCounter = 0
-        self.actionStrength = 1
+        self.velocities = {i: {'vx': 0, 'vy': 0, 'vz': 0} for i in range(self.nb_of_drones)}
+        self.drone_fpv_index = -1
+        self.action_strength = 1
 
-        self.rotation = [0.0 for i in range(self.NB_OF_DRONES)]
+        self.drone_model = ["robobee"] * self.nb_of_drones
 
-        self.create_flyingsim()
+        self.rotation = [0.0 for _ in range(self.nb_of_drones)]
+
+        self.create_flying_sim()
 
         self.action = {
-            str(i): np.array([0.3, 0.3, 0.3, 0.3]) for i in range(self.NB_OF_DRONES)
+            str(i): np.array([0.3, 0.3, 0.3, 0.3]) for i in range(self.nb_of_drones)
         }
 
         self.simulation_timer = QTimer()
         self.simulation_timer.timeout.connect(self.update_simulation)
 
         self.start_simulation()
-        # print("simulation started")
 
-    def create_flyingsim(self):
-
-        ## Define and parse (optional) arguments for the script ##
-        parser = argparse.ArgumentParser(
-            description="Helix flight script using CtrlAviary or VisionAviary and DSLPIDControl"
-        )
-        parser.add_argument(
-            "--drone",
-            default=["robobee"] * num_drones,  # hexa_6DOF_simple
-            type=list,
-            help="Drone model (default: CF2X)",
-            metavar="",
-            choices=[DroneModel],
-        )
-        parser.add_argument(
-            "--num_drones",
-            default=self.NB_OF_DRONES,
-            type=int,
-            help="Number of drones (default: 3)",
-            metavar="",
-        )
-        parser.add_argument(
-            "--physics",
-            default="pyb",
-            type=Physics,
-            help="Physics updates (default: PYB)",
-            metavar="",
-            choices=Physics,
-        )
-        parser.add_argument(
-            "--vision",
-            default=False,
-            type=str2bool,
-            help="Whether to use VisionAviary (default: False)",
-            metavar="",
-        )
-        parser.add_argument(
-            "--gui",
-            default=True,
-            type=str2bool,
-            help="Whether to use PyBullet GUI (default: True)",
-            metavar="",
-        )
-        parser.add_argument(
-            "--record_video",
-            default=False,
-            type=str2bool,
-            help="Whether to record a video (default: False)",
-            metavar="",
-        )
-        parser.add_argument(
-            "--plot",
-            default=False,
-            type=str2bool,
-            help="Whether to plot the simulation results (default: True)",
-            metavar="",
-        )
-        parser.add_argument(
-            "--user_debug_gui",
-            default=False,
-            type=str2bool,
-            help="Whether to add debug lines and parameters to the GUI (default: False)",
-            metavar="",
-        )
-        parser.add_argument(
-            "--aggregate",
-            default=True,
-            type=str2bool,
-            help="Whether to aggregate physics steps (default: True)",
-            metavar="",
-        )
-        parser.add_argument(
-            "--obstacles",
-            default=False,
-            type=str2bool,
-            help="Whether to add obstacles to the environment (default: True)",
-            metavar="",
-        )
-        parser.add_argument(
-            "--simulation_freq_hz",
-            default=240,
-            type=int,
-            help="Simulation frequency in Hz (default: 240)",
-            metavar="",
-        )
-        parser.add_argument(
-            "--control_freq_hz",
-            default=CONTROL_FREQ,
-            type=int,
-            help="Control frequency in Hz (default: 48)",
-            metavar="",
-        )
-        parser.add_argument(
-            "--duration_sec",
-            default=20000,
-            type=int,
-            help="Duration of the simulation in seconds (default: 5)",
-            metavar="",
-        )
-        parser.add_argument(
-            "--neighbourhood_radius",
-            default=2,
-            type=float,
-            help="Neighbourhood radius for the drones (default: 2)"
-        )
-        parser.add_argument(
-            "--formation_2D",
-            default=False,
-            type=str2bool,
-            help="Whether to use 2D formation (default: False)",
-        )
-        ARGS = parser.parse_args()
-
-        if ARGS.num_drones:
-            self.NB_OF_DRONES = ARGS.num_drones
-            self.rotation = [0.0 for i in range(self.NB_OF_DRONES)]
-            self.drone_model = ["robobee"] * self.NB_OF_DRONES
-
-        if ARGS.neighbourhood_radius:
-            self.neighbourhood_radius = ARGS.neighbourhood_radius
-
-        if ARGS.formation_2D:
-            self.formation_2D = ARGS.formation_2D
-
-        #### Initialize the simulation #############################
-        H = 0.50
-        H_STEP = 0.05
+    def create_flying_sim(self):
+        """Initialiser l'environnement de simulation."""
         R = 2
+        
+        # Vérifier si le nombre de drones (rentré en parametre) est le même que celui du fichier json
+        if self.nb_of_drones != len(case.vehicle_list):
+            # Si l'utilisateur veut plus de drones, nous en créons autant que nécessaire et les ajoutons à la liste des véhicules
+            if self.nb_of_drones > len(case.vehicle_list):
+                while len(case.vehicle_list) < self.nb_of_drones:
+                    n = len(case.vehicle_list)
+                    new_vehicle = vehicle.Vehicle(source_strength=3, imag_source_strength=0)
+                    new_vehicle.position = np.array([n % 10, int(n / 10), 0])
+                    new_vehicle.goal = case.vehicle_list[0].goal
+                    new_vehicle.ID = "Drone " + str(n + 1)
+                    new_vehicle.personal_vehicle_dict = case.vehicle_list[0].personal_vehicle_dict
+                    new_vehicle.arena = case.arena
+                    case.vehicle_list.append(new_vehicle)
+                    self.vehicle_list = case.vehicle_list
 
-        # myVehicle = Vehicle(
-        #     source_strength=source_strength,
-        #     imag_source_strength=imag_source_strength,
-        # )
-        # myVehicle.ID = ID
-        # # FIXME the order the setting goal and initial position matters for the first entry
-        # #  into desired vectors so be careful
-        # myVehicle.Set_Goal(goal=goal, goal_strength=sink_strength)
-        # myVehicle.set_initial_position(position)
+                self.drone_targets = [np.zeros(3) for _ in range(self.nb_of_drones)]
+                self.initial_drone_targets = [np.zeros(3) for _ in range(self.nb_of_drones)]
+                self.velocities = {i: {'vx': 0, 'vy': 0, 'vz': 0} for i in range(self.nb_of_drones)}
+                self.rotation = [0.0 for _ in range(self.nb_of_drones)]
+                self.action = {
+                    str(i): np.array([0.3, 0.3, 0.3, 0.3]) for i in range(self.nb_of_drones)
+                }
 
-        if ARGS.num_drones > len(case.vehicle_list):       # if user wants more than 5 drones, we create as many new drones as needed and add them to the vehicle_list
-            while len(case.vehicle_list) < ARGS.num_drones:
-                n = len(case.vehicle_list)
-                newvehicle = vehicle.Vehicle(source_strength=3, imag_source_strength=0)
-                newvehicle.position = np.array([n % 10, int(n/10), 0])
-                newvehicle.goal = case.vehicle_list[0].goal
-                newvehicle.ID = "Drone "+str(n+1)
-                newvehicle.personal_vehicle_dict = case.vehicle_list[0].personal_vehicle_dict
-                newvehicle.arena = case.arena
-                case.vehicle_list.append(newvehicle)
+            # Si l'utilisateur veut moins de drones, nous ignorons ceux en trop
+            if self.nb_of_drones < len(case.vehicle_list):
+                case.vehicle_list = case.vehicle_list[:self.nb_of_drones]
                 self.vehicle_list = case.vehicle_list
-            self.drone_targets = [np.zeros(3) for i in range(self.NB_OF_DRONES)]
-            self.initial_drone_targets = [np.zeros(3) for i in range(self.NB_OF_DRONES)]
-            self.velocities = {i: {'vx': 0, 'vy': 0, 'vz': 0} for i in range(self.NB_OF_DRONES)}
-            self.rotation = [0.0 for i in range(self.NB_OF_DRONES)]
-            self.action = {
-                str(i): np.array([0.3, 0.3, 0.3, 0.3]) for i in range(self.NB_OF_DRONES)
-            }
-        # case.to_json()
 
-        if ARGS.num_drones < len(case.vehicle_list):      # if user wants less than 5 drones (number of drones currently in the json file), we just forget the ones left
-            case.vehicle_list = case.vehicle_list[:ARGS.num_drones]
-            self.vehicle_list = case.vehicle_list
+        aggr_phy_steps = int(SIMULATION_FREQ_HZ / CONTROL_FREQ)
 
-        AGGR_PHY_STEPS = (
-            int(ARGS.simulation_freq_hz / ARGS.control_freq_hz) if ARGS.aggregate else 1
-        )
-        # INIT_XYZS = np.array(
-        #     [
-        #         [
-        #             i % 5,
-        #             int(i / 5),
-        #             0,
-        #         ]
-        #         for i in range(ARGS.num_drones)
-        #     ]
-        # )
-        INIT_XYZS = np.array([v.position for v in case.vehicle_list])
-        INIT_RPYS = np.array([[0.0, 0.0, 0.0] for i in range(ARGS.num_drones)])
-        INIT_VELS = np.array([[0.0, 0.0, 0.0] for _ in range(ARGS.num_drones)])
+        init_xyzs = np.array([v.position for v in case.vehicle_list])
+        init_rpys = np.array([[0.0, 0.0, 0.0] for _ in range(self.nb_of_drones)])
+        init_vels = np.array([[0.0, 0.0, 0.0] for _ in range(self.nb_of_drones)])
         for v in case.vehicle_list:
             v.state = 1
 
-        #### Initialize a circular trajectory ######################
-        PERIOD = 15
-        NUM_WP = ARGS.control_freq_hz * PERIOD
+        # Initialiser une trajectoire circulaire
+        period = 15
+        num_wp = CONTROL_FREQ * period
 
-        TARGET_POS = np.zeros((NUM_WP, 3))
-        for i in range(NUM_WP):
-            TARGET_POS[i, :] = (
-                R * np.cos((i / NUM_WP) * (4 * np.pi) + np.pi / 2) + INIT_XYZS[0, 0],
-                R * np.sin((i / NUM_WP) * (4 * np.pi) + np.pi / 2) - R + INIT_XYZS[0, 1],
+        target_pos = np.zeros((num_wp, 3))
+        for i in range(num_wp):
+            angle = (i / num_wp) * (4 * np.pi) + np.pi / 2
+            target_pos[i, :] = (
+                R * np.cos(angle) + init_xyzs[0, 0],
+                R * np.sin(angle) - R + init_xyzs[0, 1],
                 0,
             )
 
-        TARGET_RPYS = np.zeros((NUM_WP, 3))
-        for i in range(NUM_WP):
-            TARGET_RPYS[i, :] = [0.0, 0.0, 0.0]  # 0.4+(i*1./200)]
+        target_rpys = np.zeros((num_wp, 3))
 
-        #### Create the environment
+        # Créer l'environnement
         self.env = CtrlAviary(
             drone_model=self.drone_model,
-            num_drones=ARGS.num_drones,
-            initial_xyzs=INIT_XYZS,
-            initial_vels=INIT_VELS,
-            initial_rpys=INIT_RPYS,
-            physics=ARGS.physics,
-            neighbourhood_radius=10,
-            freq=ARGS.simulation_freq_hz,
-            aggregate_phy_steps=AGGR_PHY_STEPS,
-            gui=ARGS.gui,
-            record=ARGS.record_video,
-            obstacles=ARGS.obstacles,
-            user_debug_gui=ARGS.user_debug_gui,
+            num_drones=self.nb_of_drones,
+            initial_xyzs=init_xyzs,
+            initial_vels=init_vels,
+            initial_rpys=init_rpys,
+            physics=Physics.PYB,
+            neighbourhood_radius=10,  # À vérifier si impact sur pgflow
+            freq=SIMULATION_FREQ_HZ,
+            aggregate_phy_steps=aggr_phy_steps,
+            gui=True,
+            record=False,
+            obstacles=False,
+            user_debug_gui=False,
         )
 
-        #### Obtain the PyBullet Client ID from the environment ####
-        PYB_CLIENT = self.env.getPyBulletClient()
-        self.ARGS = ARGS
+        # Obtenir l'ID du client PyBullet depuis l'environnement
+        pyb_client = self.env.getPyBulletClient()
 
         polygons = []
         obstacles = data["scenebuilder"]["buildings"]
         sys.stdout.flush()
-        for id, obs in enumerate(obstacles):
+        for obs in obstacles:
             floor = np.array(obs["vertices"]).copy()
             floor[:, 2] = 0.0
             ceil = np.array(obs["vertices"]).copy()
-            # ceil[:,2] = 3.0
             tmp = np.vstack((floor, ceil))
             polygons.append(tmp)
 
-        # Create polygons in the simulation
+        # Créer les polygones dans la simulation
         for polygon_vertices in polygons:
             polygon_id = p.createCollisionShape(p.GEOM_MESH, vertices=polygon_vertices)
             p.createMultiBody(baseCollisionShapeIndex=polygon_id)
 
-        #### Initialize the controllers ############################
+        # Initialiser les contrôleurs
         self.ctrl = [INDIControl(drone_model=drone) for drone in self.drone_model]
-        #### Run the simulation ####################################
-        self.CTRL_EVERY_N_STEPS = int(np.floor(self.env.SIM_FREQ / ARGS.control_freq_hz))
+        # Exécuter la simulation
+        self.ctrl_every_n_steps = int(np.floor(self.env.SIM_FREQ / CONTROL_FREQ))
 
     def update_simulation(self):
+        """Mettre à jour la simulation à chaque étape de temps."""
+        global frame_index
 
-        #start timer
-        global frameIndex
-
-        # calculate time for env.step and print average after 500 frames 
+        # Chronométrer l'appel de env.step
         time_before_env_step = time.time()
 
-        #### Step the simulation ###################################
+        # Avancer la simulation
         obs, reward, done, info = self.env.step(self.action)
 
-        
         time_after_env_step = time.time()
-        time_taken_pgflow[frameIndex] = (time_after_env_step - time_before_env_step)
-        if frameIndex == 499:
-            avg = sum(time_taken_pgflow)/500
-            print("Time for env_step (dronesim) in ms: ", avg*1000)
-            print("FPS max (dronesim): ", 1/avg)
+        time_taken_pgflow[frame_index] = (time_after_env_step - time_before_env_step)
+        if frame_index == 499:
+            avg = sum(time_taken_pgflow) / 500
+            print("Temps pour env_step (dronesim) en ms :", avg * 1000)
+            print("FPS max (dronesim) :", 1 / avg)
 
-        for i in range(self.NB_OF_DRONES):  ## Update the target of the drones in case user sent a new target
+        # Mettre à jour la cible des drones si une nouvelle cible est définie
+        for i in range(self.nb_of_drones):
             vehicle = case.vehicle_list[i]
             if self.target_mode == 1 and self.is_individual_target_set(i):
                 vehicle.goal = self.drone_targets[i]
             elif self.target_mode == 0 and self.is_fleet_target_set():
                 vehicle.goal = self.fleet_target
-            else:    
-                vehicle.state=1
+            else:
+                vehicle.state = 1
         case.vehicle_list = self.vehicle_list
 
-        if self.droneFPVIndex == -1:
-            for j in range(self.NB_OF_DRONES):
+        if self.drone_fpv_index == -1:
+            for j in range(self.nb_of_drones):
                 self.rotation[j] = self.env.rpy[j, 2]
-                # print(f"{obs[str(j)]["state"]}")
                 pos = obs[str(j)]["state"][:3]
                 case.vehicle_list[j].position = pos
 
-        # calculate time for step_simulation and print average after 500 frames  
+        # Chronométrer l'appel de step_simulation
         time_before_step_simulation = time.time()
 
         step_simulation(case)
 
         time_after_step_simulation = time.time()
-        time_taken_pgflow[frameIndex] = (time_after_step_simulation - time_before_step_simulation)
-        if frameIndex == 499:
-            avg = sum(time_taken_pgflow)/500
-            print("Time for step_simulation (pgflow) in ms: ", avg*1000)
-            print("FPS max (pgflow): ", 1/avg)
-            frameIndex = 0
+        time_taken_pgflow[frame_index] = (time_after_step_simulation - time_before_step_simulation)
+        if frame_index == 499:
+            avg = sum(time_taken_pgflow) / 500
+            print("Temps pour step_simulation (pgflow) en ms :", avg * 1000)
+            print("FPS max (pgflow) :", 1 / avg)
+            frame_index = 0
         else:
-            frameIndex+=1
+            frame_index += 1
 
-        #### Compute control for the current way point #############
+        # Calculer le contrôle pour le point de cheminement actuel
         for j in range(self.env.NUM_DRONES):
-
-            if j == self.droneFPVIndex:  ##### if the drone is controlled in FPV, target velocities and rotations are those received by OSC instead of PGFlow
-                desired_vector = np.array([self.velocities[j]['vx'], self.velocities[j]['vy'], self.velocities[j]['vz']])
+            if j == self.drone_fpv_index:
+                # Si le drone est contrôlé en FPV
+                desired_vector = np.array([
+                    self.velocities[j]['vx'],
+                    self.velocities[j]['vy'],
+                    self.velocities[j]['vz']
+                ])
                 self.action[str(j)], _, _ = self.ctrl[j].computeControlFromState(
-                    control_timestep=self.CTRL_EVERY_N_STEPS * self.env.TIMESTEP,
+                    control_timestep=self.ctrl_every_n_steps * self.env.TIMESTEP,
                     state=obs[str(j)]["state"],
                     target_pos=np.hstack([obs[str(j)]["state"][:2], obs[str(j)]["state"][2]]),
-                    target_vel=desired_vector * FPV_speed * self.actionStrength,
-                    # target_acc=np.zeros(3),
+                    target_vel=desired_vector * FPV_SPEED * self.action_strength,
                     target_rpy=self.rotation[j] * np.array([0, 0, 1])
-                    # target_rpy_rates=np.zeros(3)
                 )
-                self.velocities[j] = {'vx': 0, 'vy': 0, 'vz': 0}     # reset desired vector after it has been processed by dronesim
+                # Réinitialiser le vecteur désiré après son traitement
+                self.velocities[j] = {'vx': 0, 'vy': 0, 'vz': 0}
             else:
                 vehicle = case.vehicle_list[j]
-                # if vehicle.state==1:
-                #     desired_vector = np.array([0,0,-1])
-                # else:
                 desired_vector = vehicle.desired_vectors[-1]
                 desired_vector = np.hstack([desired_vector, 0])
 
-                ##### NOTE HERE IS WHERE YOU WOULD PUT YOUR TARGET VELOCITY FOR THE DRONES TO FOLLOW
+                # Calculer la commande de contrôle
                 self.action[str(j)], _, _ = self.ctrl[j].computeControlFromState(
-                    control_timestep=self.CTRL_EVERY_N_STEPS * self.env.TIMESTEP,
+                    control_timestep=self.ctrl_every_n_steps * self.env.TIMESTEP,
                     state=obs[str(j)]["state"],
                     target_pos=np.hstack([obs[str(j)]["state"][:2], 2]),
                     target_vel=desired_vector * vehicle.max_speed,
-                    # target_acc=np.zeros(3),
                     target_rpy=[0, 0, np.arctan2(desired_vector[1], desired_vector[0])]
-                    # target_rpy_rates=np.zeros(3),
                 )
 
-        #### Printout ##############################################
-        # self.env.render()
-
     def is_individual_target_set(self, i):
+        """Vérifier si la cible individuelle pour le drone i est définie."""
         return np.any(self.drone_targets[i])
-    
+
     def is_fleet_target_set(self):
+        """Vérifier si la cible de la flotte est définie."""
         return np.any(self.fleet_target)
 
     def start_simulation(self):
+        """Démarrer le minuteur de simulation."""
         self.simulation_timer.start(CONTROL_RATE)
 
     def stop_simulation(self):
+        """Arrêter le minuteur de simulation."""
         self.simulation_timer.stop()
 
     def close_env(self):
-        ### Close the environment ###
+        """Fermer l'environnement de simulation."""
         self.env.close()
-
-    # EOF
 
 
 if __name__ == "__main__":
