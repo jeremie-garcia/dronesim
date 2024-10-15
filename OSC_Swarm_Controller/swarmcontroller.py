@@ -44,11 +44,12 @@ for i in range(num_drones):
 
 # Paramètres de la carte et buildings
 ArenaMap.size = 0.5  # Taille du panneau; plus il y a de panneaux, meilleure est la précision mais plus le calcul est important
-ArenaMap.inflation_radius = 0.3  # Les sources sont éloignés des bâtiments pour plus d'anticipation (penser a rajouter des panneaux dans ce cas)
+ArenaMap.inflation_radius = 0.3  # Les sources sont éloignés des bâtiments pour plus d'anticipation 
 
 
 case.mode = ''  # Le garder à 'none' est la meilleure option en termes de vitesse / autre mode 'fancy' pour l'anticipation des drones
 case.building_detection_threshold = 4  # Distance pour que les drones voient les bâtiments (impact sur les performances) / conseil : 4
+# --> Aucun impact sur la même simulation avec 10 ou 4
 case.max_avoidance_distance = 4  # Distance pour que les drones se voient entre eux (impact sur les performances) / conseil : 4
 set_new_attribute(case, 'source_strength', 1)  # Force de la source du véhicule (pas d'impact sur les performances)
 
@@ -80,7 +81,7 @@ class SwarmController(QObject):
         self.drone_targets = [np.zeros(3) for _ in range(self.nb_of_drones)]
         self.fleet_target = np.zeros(3)
         self.initial_drone_targets = self.drone_targets.copy()
-        self.initial_fleet_target = self.fleet_target.copy()
+        #self.initial_fleet_target = self.fleet_target.copy()
 
         self.velocities = {i: {'vx': 0, 'vy': 0, 'vz': 0} for i in range(self.nb_of_drones)}
         self.drone_fpv_index = -1
@@ -98,6 +99,9 @@ class SwarmController(QObject):
 
         self.simulation_timer = QTimer()
         self.simulation_timer.timeout.connect(self.update_simulation)
+
+        """Test with an initial target for the fleet"""
+        self.fleet_target = np.array([20.33, 7.74, 8.2])
 
         self.start_simulation()
 
@@ -139,7 +143,7 @@ class SwarmController(QObject):
         init_rpys = np.array([[0.0, 0.0, 0.0] for _ in range(self.nb_of_drones)])
         init_vels = np.array([[0.0, 0.0, 0.0] for _ in range(self.nb_of_drones)])
         for v in case.vehicle_list:
-            v.state = 1
+            v.state = 0 #set to 1 to make the drones static at the beginning
 
         # Initialiser une trajectoire circulaire
         period = 15
@@ -167,7 +171,7 @@ class SwarmController(QObject):
             neighbourhood_radius=10,  # À vérifier si impact sur pgflow
             freq=SIMULATION_FREQ_HZ,
             aggregate_phy_steps=aggr_phy_steps,
-            gui=True,
+            gui=self.gui,
             record=False,
             obstacles=False,
             user_debug_gui=False,
@@ -230,11 +234,9 @@ class SwarmController(QObject):
                 pos = obs[str(j)]["state"][:3]
                 case.vehicle_list[j].position = pos
 
-        # Chronométrer l'appel de step_simulation
+        """ Chronométrer l'appel de step_simulation"""
         time_before_step_simulation = time.time()
-
         step_simulation(case)
-
         time_after_step_simulation = time.time()
         time_taken_pgflow[frame_index] = (time_after_step_simulation - time_before_step_simulation)
         if frame_index == 499:

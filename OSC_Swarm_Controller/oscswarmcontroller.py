@@ -9,12 +9,13 @@ from swarmcontroller import SwarmController
 # Configuration du parser d'arguments
 parser = argparse.ArgumentParser(description='OscSwarmController Configuration')
 
-parser.add_argument('--vr_headset', action='store_true', default=True, help='Set this flag if using a VR headset')
+parser.add_argument('--unity_editor', action="store_true", help='Set this flag if launching the simulation from Unity Editor or the current device')
 parser.add_argument('--nb_drones', type=int, default=5, help='Number of drones in the simulation')
+parser.add_argument('--gui', action="store_true", help='Set this flag to display the GUI')
 
 args = parser.parse_args()
 
-if args.vr_headset: # Set the IP of the VR headset
+if not args.unity_editor: # Set the IP of the VR headset
     OSC_CLIENT_IP = "10.1.124.238" # ENAC_AUTH
 else:
     OSC_CLIENT_IP = "127.0.0.1"
@@ -44,6 +45,8 @@ class OscSwarmController(SwarmController):
         self.data_send_timer.timeout.connect(self.send_simulation_data_via_osc)
 
         self.nb_of_drones = args.nb_drones
+        self.gui = args.gui
+        print("gui : ", self.gui)
 
         # init parent class with simulation and threads for scene update
         super().__init__()
@@ -58,7 +61,6 @@ class OscSwarmController(SwarmController):
 
     # Method to handle incoming OSC data
     def handle_osc_data(self, addr, data):
-        print("Received OSC message: ", addr, data)
 
         if addr == osc_protocol.SET_DRONE_VELOCITIES:
             self.set_drone_velocities(data)
@@ -79,7 +81,7 @@ class OscSwarmController(SwarmController):
             self.reset_targets(data)
 
         elif addr == osc_protocol.EXIT_FPV_MODE:  # command sent when the user quits FPV on the current selected drone
-            self.droneFPVIndex = -1
+            self.drone_fpv_index = -1
 
         elif addr == osc_protocol.DEBUG_MESSAGE:
             print("Debug message: ", data)
@@ -92,8 +94,8 @@ class OscSwarmController(SwarmController):
             self.velocities[id_drone]['vx'] = float(data[1])
             self.velocities[id_drone]['vz'] = float(data[2])
             self.velocities[id_drone]['vy'] = float(data[3])
-            self.droneFPVIndex = id_drone
-        self.actionStrength = float(data[4])
+            self.drone_fpv_index = id_drone
+        self.action_strength = float(data[4])
 
     def set_drone_rotation(self, data_string):
         data = self.to_array(data_string)
@@ -110,8 +112,7 @@ class OscSwarmController(SwarmController):
         xtarget = float(data[0])
         ztarget = float(data[1])
         ytarget = float(data[2])
-        for i in range (self.nb_of_drones):
-            self.old_fleet_target = self.fleet_target    
+        for i in range (self.nb_of_drones):    
             self.fleet_target = [xtarget, ytarget, ztarget]
             if self.target_mode == 0: self.vehicle_list[i].state=0
         print("new target for fleet: ", xtarget, ytarget, ztarget)
