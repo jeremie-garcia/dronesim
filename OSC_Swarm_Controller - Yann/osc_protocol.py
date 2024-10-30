@@ -64,10 +64,6 @@ RESET_TARGETS = "/reset_targets"
 ###
 DEBUG_MESSAGE = "/debug_message"
 
-###
-# OSC address for sending drone landing command
-###
-LAUNCH_DRONE = "/launch_drone"
 
 
 

@@ -63,27 +63,31 @@ class OscSwarmController(SwarmController):
     def handle_osc_data(self, addr, data):
 
         if addr == osc_protocol.SET_DRONE_VELOCITIES:
+            print("set drone velocities", data)
             self.set_drone_velocities(data)
 
         elif addr == osc_protocol.SET_DRONE_ROTATION:
+            print("set drone rotation", data)
             self.set_drone_rotation(data)
 
-        elif addr == osc_protocol.LAUNCH_DRONE:
-            self.launch_drone()
-
-        elif addr == osc_protocol.SET_DRONE_TARGET:
+        if addr == osc_protocol.SET_DRONE_TARGET:
+            print("set drone target", data)
             self.set_drone_target(data)
         
         elif addr == osc_protocol.SET_FLEET_TARGET:
+            print("set fleet target", data)
             self.set_fleet_target(data)
 
         elif addr == osc_protocol.SET_TARGET_MODE:
+            print("set target mode", data)
             self.set_target_mode(data)
 
         elif addr == osc_protocol.RESET_TARGETS:
+            print("reset targets")
             self.reset_targets(data)
 
         elif addr == osc_protocol.EXIT_FPV_MODE:  # command sent when the user quits FPV on the current selected drone
+            print("exit FPV mode")
             self.drone_fpv_index = -1
 
         elif addr == osc_protocol.DEBUG_MESSAGE:
@@ -109,11 +113,6 @@ class OscSwarmController(SwarmController):
             self.rotation[drone_id] -= 0.03 * rotationStrength
         elif direction == -1:
             self.rotation[drone_id] += 0.03 * rotationStrength
-
-    def launch_drone(self):
-        print("Landing drone")
-        self.set_drone_state_to_launch()
-
 
     def set_fleet_target(self, data_string):
         data = self.to_array(data_string)

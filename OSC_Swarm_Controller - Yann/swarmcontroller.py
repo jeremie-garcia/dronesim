@@ -3,7 +3,6 @@ import sys
 import time
 import json
 import argparse
-import numpy as np
 
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import QObject, QTimer
@@ -73,8 +72,6 @@ class SwarmController(QObject):
 
         print("Serveur OSC démarré")
         sys.stdout.flush()
-
-        self.wainting_for_launch = True
 
         self.env = None
         #self.nb_of_drones = 5
@@ -146,7 +143,7 @@ class SwarmController(QObject):
         init_rpys = np.array([[0.0, 0.0, 0.0] for _ in range(self.nb_of_drones)])
         init_vels = np.array([[0.0, 0.0, 0.0] for _ in range(self.nb_of_drones)])
         for v in case.vehicle_list:
-            v.state = 1 # 1 for stationary / 0 for moving to the target
+            v.state = 0 #set to 1 to make the drones static at the beginning
 
         # Initialiser une trajectoire circulaire
         period = 15
@@ -270,29 +267,17 @@ class SwarmController(QObject):
                 self.velocities[j] = {'vx': 0, 'vy': 0, 'vz': 0}
             else:
                 vehicle = case.vehicle_list[j]
-
-                if self.wainting_for_launch :
-                    target_pos = obs[str(j)]["state"][:3]
-                    target_vel = np.array([0, 0, 0])
-                    target_rpy = [0, 0, 0]
-                
-                else :
-                    desired_vector = vehicle.desired_vectors[-1]
-                    desired_vector = np.hstack([desired_vector, 0])
-                    
-                    target_pos = np.hstack([obs[str(j)]["state"][:2], 2])
-                    target_vel = desired_vector * vehicle.max_speed
-                    target_rpy = [0, 0, np.arctan2(desired_vector[1], desired_vector[0])]
+                desired_vector = vehicle.desired_vectors[-1]
+                desired_vector = np.hstack([desired_vector, 0])
 
                 # Calculer la commande de contrôle
                 self.action[str(j)], _, _ = self.ctrl[j].computeControlFromState(
                     control_timestep=self.ctrl_every_n_steps * self.env.TIMESTEP,
                     state=obs[str(j)]["state"],
-                    target_pos=target_pos, 
-                    target_vel=target_vel,
-                    target_rpy=target_rpy
+                    target_pos=np.hstack([obs[str(j)]["state"][:2], 2]),
+                    target_vel=desired_vector * vehicle.max_speed,
+                    target_rpy=[0, 0, np.arctan2(desired_vector[1], desired_vector[0])]
                 )
-
 
     def is_individual_target_set(self, i):
         """Vérifier si la cible individuelle pour le drone i est définie."""
@@ -313,11 +298,6 @@ class SwarmController(QObject):
     def close_env(self):
         """Fermer l'environnement de simulation."""
         self.env.close()
-
-    def set_drone_state_to_launch(self):
-        self.wainting_for_launch = False
-        for v in case.vehicle_list:
-            v.state = 0
 
 
 if __name__ == "__main__":
