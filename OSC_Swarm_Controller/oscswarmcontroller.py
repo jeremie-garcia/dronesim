@@ -5,6 +5,7 @@ import argparse
 import osc_protocol
 from OSCServer import OSCServer, OSCThread
 from swarmcontroller import SwarmController
+from PlaceHomogeneousPointsInZone import generate_relaxed_points
 
 # Configuration du parser d'arguments
 parser = argparse.ArgumentParser(description='OscSwarmController Configuration')
@@ -82,6 +83,9 @@ class OscSwarmController(SwarmController):
 
         elif addr == osc_protocol.RESET_TARGETS:
             self.reset_targets(data)
+
+        elif addr == osc_protocol.SET_ZONE:
+            self.set_zone(data)
 
         elif addr == osc_protocol.EXIT_FPV_MODE:  # command sent when the user quits FPV on the current selected drone
             self.drone_fpv_index = -1
@@ -174,6 +178,13 @@ class OscSwarmController(SwarmController):
     def stop_simulation(self):
         self.simulation_timer.stop()
         self.data_send_timer.stop()
+
+    def set_zone(self, data_string):
+        print(data_string)
+        relaxed_points = generate_relaxed_points(data_string, num_points=self.nb_of_drones)
+        print(f"{relaxed_points}")
+        self.send_osc(osc_protocol.SET_TARGETS_IN_ZONE, f"{relaxed_points}")
+
 
 if __name__ == "__main__":
     from PyQt6.QtWidgets import QApplication

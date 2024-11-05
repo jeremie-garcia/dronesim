@@ -69,6 +69,18 @@ DEBUG_MESSAGE = "/debug_message"
 ###
 LAUNCH_DRONE = "/launch_drone"
 
+###
+# OSC address for getting the zone coordinates and placing target points
+# parameters: list of coordinates in str
+###
+SET_ZONE = "/set_zone"
+
+###
+# OSC address for sending the target of each drones inside the selected zone
+# parameters: list of coordinates in str
+###
+SET_TARGETS_IN_ZONE = "/set_targets_in_zone"
+
 
 
 
