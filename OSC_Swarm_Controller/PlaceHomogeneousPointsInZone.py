@@ -2,6 +2,7 @@ import numpy as np
 from scipy.spatial import Voronoi
 from shapely.geometry import Polygon, Point
 import ast
+import re
 
 def generate_relaxed_points(data_string, num_points=10, iterations=1000):
     """
@@ -20,9 +21,17 @@ def generate_relaxed_points(data_string, num_points=10, iterations=1000):
     - relaxed_coords: list of [x, y]
         List of relaxed points as coordinate pairs.
     """
+   # Replace commas in numbers with dots
+    def replace_commas_in_numbers(match):
+        number_with_commas = match.group(0)
+        number_with_dots = number_with_commas.replace(',', '.')
+        return number_with_dots
+
+    data_string_processed = re.sub(r'\d+(?:,\d+)*', replace_commas_in_numbers, data_string)
+    
     # Parse the data_string to get polygon_coords
     try:
-        polygon_coords = ast.literal_eval(data_string) # Convert string to list
+        polygon_coords = ast.literal_eval(data_string_processed) # Convert string to list
         if not isinstance(polygon_coords, list):
             raise ValueError("Parsed data is not a list.")
         # Ensure each coordinate is a list or tuple of length 2
