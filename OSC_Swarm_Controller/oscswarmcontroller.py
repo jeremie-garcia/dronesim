@@ -17,7 +17,7 @@ parser.add_argument('--gui', action="store_true", help='Set this flag to display
 args = parser.parse_args()
 
 if not args.unity_editor: # Set the IP of the VR headset
-    OSC_CLIENT_IP = "10.1.124.238" # ENAC_AUTH
+    OSC_CLIENT_IP = "10.1.121.40" # ENAC_AUTH
 else:
     OSC_CLIENT_IP = "127.0.0.1"
 

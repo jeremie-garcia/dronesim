@@ -36,6 +36,7 @@ def generate_relaxed_points(data_string, num_points=10, iterations=1000):
             raise ValueError("Parsed data is not a list.")
         # Ensure each coordinate is a list or tuple of length 2
         for coords in polygon_coords:
+            print(coords)
             if not (isinstance(coords, list) or isinstance(coords, tuple)) or len(coords) != 2:
                 raise ValueError("Each coordinate should be a list or tuple of length 2.")
     except (SyntaxError, ValueError) as e:
