@@ -102,6 +102,7 @@ class OscSwarmController(SwarmController):
             self.velocities[id_drone]['vz'] = float(data[2])
             self.velocities[id_drone]['vy'] = float(data[3])
             self.drone_fpv_index = id_drone
+            # print("Drone ", id_drone, " velocities set to: ", self.velocities[id_drone])
         self.action_strength = float(data[4])
 
     def set_drone_rotation(self, data_string):
@@ -115,7 +116,7 @@ class OscSwarmController(SwarmController):
             self.rotation[drone_id] += 0.03 * rotationStrength
 
     def launch_drone(self):
-        print("Landing drone")
+        print("Take off drone")
         self.set_drone_state_to_launch()
 
 
@@ -136,7 +137,7 @@ class OscSwarmController(SwarmController):
         ztarget = float(data[2])
         ytarget = float(data[3])
         self.drone_targets[drone_id] = [xtarget, ytarget, ztarget]
-        if self.target_mode == 1: self.vehicle_list[drone_id].state=0
+        #if self.target_mode == 1: self.vehicle_list[drone_id].state=0
         print("new target for drone", drone_id, ": ", xtarget, ytarget, ztarget)
 
     def set_target_mode(self, data):

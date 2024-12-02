@@ -80,7 +80,7 @@ class SwarmController(QObject):
         #self.nb_of_drones = 5
         self.vehicle_list = case.vehicle_list
 
-        self.target_mode = 0  # 0 pour la flotte, 1 pour individuel
+        self.target_mode = 1  # 0 pour la flotte, 1 pour individuel
         self.drone_targets = [np.zeros(3) for _ in range(self.nb_of_drones)]
         self.fleet_target = np.zeros(3)
         self.initial_drone_targets = self.drone_targets.copy()
@@ -213,12 +213,11 @@ class SwarmController(QObject):
         # Avancer la simulation
         obs, reward, done, info = self.env.step(self.action)
 
+        # TODO : A enlever
         time_after_env_step = time.time()
         time_taken_pgflow[frame_index] = (time_after_env_step - time_before_env_step)
         if frame_index == 499:
             avg = sum(time_taken_pgflow) / 500
-            print("Temps pour env_step (dronesim) en ms :", avg * 1000)
-            print("FPS max (dronesim) :", 1 / avg)
 
         # Mettre à jour la cible des drones si une nouvelle cible est définie
         for i in range(self.nb_of_drones):
@@ -237,6 +236,7 @@ class SwarmController(QObject):
                 pos = obs[str(j)]["state"][:3]
                 case.vehicle_list[j].position = pos
 
+        #TODO : A enlever
         """ Chronométrer l'appel de step_simulation"""
         time_before_step_simulation = time.time()
         step_simulation(case)
@@ -244,8 +244,6 @@ class SwarmController(QObject):
         time_taken_pgflow[frame_index] = (time_after_step_simulation - time_before_step_simulation)
         if frame_index == 499:
             avg = sum(time_taken_pgflow) / 500
-            print("Temps pour step_simulation (pgflow) en ms :", avg * 1000)
-            print("FPS max (pgflow) :", 1 / avg)
             frame_index = 0
         else:
             frame_index += 1
@@ -262,7 +260,7 @@ class SwarmController(QObject):
                 self.action[str(j)], _, _ = self.ctrl[j].computeControlFromState(
                     control_timestep=self.ctrl_every_n_steps * self.env.TIMESTEP,
                     state=obs[str(j)]["state"],
-                    target_pos=np.hstack([obs[str(j)]["state"][:2], obs[str(j)]["state"][2]]),
+                    target_pos=np.hstack([obs[str(j)]["state"][:3]]),
                     target_vel=desired_vector * FPV_SPEED * self.action_strength,
                     target_rpy=self.rotation[j] * np.array([0, 0, 1])
                 )
@@ -279,10 +277,20 @@ class SwarmController(QObject):
                 else :
                     desired_vector = vehicle.desired_vectors[-1]
                     desired_vector = np.hstack([desired_vector, 0])
-                    
-                    target_pos = np.hstack([obs[str(j)]["state"][:2], 2])
+                    if obs[str(j)]["state"][2] < self.drone_targets[j][2]:
+                        target_pos = np.hstack([obs[str(j)]["state"][:2], obs[str(j)]["state"][2] + 1])
+                    else:
+                        target_pos = np.hstack([obs[str(j)]["state"][:2], obs[str(j)]["state"][2]])
                     target_vel = desired_vector * vehicle.max_speed
                     target_rpy = [0, 0, np.arctan2(desired_vector[1], desired_vector[0])]
+                    # if j == 0:
+                    #     print("Drone ", j)
+                    #     print("target_pos : ", target_pos)
+                    #     print("target_vel : ", target_vel)
+                    #     print("target_rpy : ", target_rpy)
+                    #     print("desired_vector : ", desired_vector)
+                    #     print("obs state : ", obs[str(j)]["state"])
+                    #     print()
 
                 # Calculer la commande de contrôle
                 self.action[str(j)], _, _ = self.ctrl[j].computeControlFromState(
