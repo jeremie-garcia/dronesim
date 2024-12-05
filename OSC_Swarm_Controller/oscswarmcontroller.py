@@ -137,7 +137,8 @@ class OscSwarmController(SwarmController):
         ztarget = float(data[2])
         ytarget = float(data[3])
         self.drone_targets[drone_id] = [xtarget, ytarget, ztarget]
-        #if self.target_mode == 1: self.vehicle_list[drone_id].state=0
+        if self.target_mode == 1: 
+            self.vehicle_list[drone_id].state=0
         print("new target for drone", drone_id, ": ", xtarget, ytarget, ztarget)
 
     def set_target_mode(self, data):

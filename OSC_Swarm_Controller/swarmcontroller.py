@@ -74,7 +74,7 @@ class SwarmController(QObject):
         print("Serveur OSC démarré")
         sys.stdout.flush()
 
-        self.wainting_for_launch = True
+        self.waiting_for_launch = True
 
         self.env = None
         #self.nb_of_drones = 5
@@ -205,19 +205,9 @@ class SwarmController(QObject):
 
     def update_simulation(self):
         """Mettre à jour la simulation à chaque étape de temps."""
-        global frame_index
-
-        # Chronométrer l'appel de env.step
-        time_before_env_step = time.time()
 
         # Avancer la simulation
         obs, reward, done, info = self.env.step(self.action)
-
-        # TODO : A enlever
-        time_after_env_step = time.time()
-        time_taken_pgflow[frame_index] = (time_after_env_step - time_before_env_step)
-        if frame_index == 499:
-            avg = sum(time_taken_pgflow) / 500
 
         # Mettre à jour la cible des drones si une nouvelle cible est définie
         for i in range(self.nb_of_drones):
@@ -230,23 +220,12 @@ class SwarmController(QObject):
                 vehicle.state = 1
         case.vehicle_list = self.vehicle_list
 
-        if self.drone_fpv_index == -1:
-            for j in range(self.nb_of_drones):
-                self.rotation[j] = self.env.rpy[j, 2]
-                pos = obs[str(j)]["state"][:3]
-                case.vehicle_list[j].position = pos
+        # Mettre à jour les positions des drones dans pgflow
+        for j in range(self.nb_of_drones):
+            if j!= self.drone_fpv_index:
+                case.vehicle_list[j].position = obs[str(j)]["state"][:3]
 
-        #TODO : A enlever
-        """ Chronométrer l'appel de step_simulation"""
-        time_before_step_simulation = time.time()
-        step_simulation(case)
-        time_after_step_simulation = time.time()
-        time_taken_pgflow[frame_index] = (time_after_step_simulation - time_before_step_simulation)
-        if frame_index == 499:
-            avg = sum(time_taken_pgflow) / 500
-            frame_index = 0
-        else:
-            frame_index += 1
+        step_simulation(case) # Step de PgFlow
 
         # Calculer le contrôle pour le point de cheminement actuel
         for j in range(self.env.NUM_DRONES):
@@ -269,7 +248,7 @@ class SwarmController(QObject):
             else:
                 vehicle = case.vehicle_list[j]
 
-                if self.wainting_for_launch :
+                if self.waiting_for_launch :
                     target_pos = obs[str(j)]["state"][:3]
                     target_vel = np.array([0, 0, 0])
                     target_rpy = [0, 0, 0]
@@ -277,18 +256,21 @@ class SwarmController(QObject):
                 else :
                     desired_vector = vehicle.desired_vectors[-1]
                     desired_vector = np.hstack([desired_vector, 0])
+
+                    # Controler la hauteur du drone
                     if obs[str(j)]["state"][2] < self.drone_targets[j][2]:
                         target_pos = np.hstack([obs[str(j)]["state"][:2], obs[str(j)]["state"][2] + 1])
                     else:
                         target_pos = np.hstack([obs[str(j)]["state"][:2], obs[str(j)]["state"][2]])
+
                     target_vel = desired_vector * vehicle.max_speed
-                    target_rpy = [0, 0, np.arctan2(desired_vector[1], desired_vector[0])]
-                    # if j == 0:
+                    target_rpy = [0, 0, np.arctan2(desired_vector[0], desired_vector[1])]
+                    # if j == 4:
                     #     print("Drone ", j)
                     #     print("target_pos : ", target_pos)
                     #     print("target_vel : ", target_vel)
-                    #     print("target_rpy : ", target_rpy)
-                    #     print("desired_vector : ", desired_vector)
+                    #    print("target_rpy : ", target_rpy)
+                    #    print("desired_vector : ", desired_vector)
                     #     print("obs state : ", obs[str(j)]["state"])
                     #     print()
 
@@ -323,7 +305,7 @@ class SwarmController(QObject):
         self.env.close()
 
     def set_drone_state_to_launch(self):
-        self.wainting_for_launch = False
+        self.waiting_for_launch = False
         for v in case.vehicle_list:
             v.state = 0
 

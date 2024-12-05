@@ -1,95 +1,281 @@
-# from PlaceHomogeneousPointsInZone import generate_relaxed_points
+"""Script demonstrating the dronesim integration
+NOTE SEE README FOR ADDITIONAL DEPENDANCIES
 
-# data_string = "[[373.1137, 114.1604], [371.8446, 109.2067], [365.2107, 111.1211], [358.9317, 113.6646], [349.6094, 116.1712], [337.3386, 114.4723], [321.368, 111.348], [311.154, 108.8157], [301.6672, 104.1241], [294.3586, 101.7708], [284.0513, 102.7553], [269.9465, 106.9397], [255.9055, 110.7102], [241.1849, 114.9598], [229.188, 116.5114], [215.9669, 116.8528], [202.7015, 125.4388], [194.1635, 137.4292], [188.4225, 154.1989], [182.8929, 169.9486], [180.3201, 186.0556], [174.3452, 201.0879], [166.1181, 216.2103], [155.8573, 230.9045], [147.907, 246.29], [140.8328, 262.0089], [136.477, 279.8167], [136.4165, 297.2284], [134.1736, 315.7289], [131.8721, 332.7748], [134.4662, 344.7558], [134.3878, 356.0133], [131.1751, 369.5604], [133.9034, 380.6879], [142.8212, 393.7831], [159.0959, 406.1145], [173.306, 419.035], [190.4665, 431.5323], [203.4956, 443.083], [215.8334, 454.3948], [228.913, 461.5452], [241.5366, 467.3407], [254.8916, 471.9225], [268.6401, 475.0311], [285.4601, 478.6144], [304.5397, 480.2299], [323.0768, 483.2185], [340.5895, 486.4331], [357.4611, 488.2809], [372.4318, 487.9362], [386.9002, 485.3282], [400.1117, 480.9183], [410.5583, 469.9876], [423.3351, 460.0084], [438.1455, 446.9809], [451.0481, 434.028], [461.1772, 423.9272], [467.4336, 415.4895], [472.5055, 406.7267], [478.1209, 396.4081], [483.8834, 377.9023], [490.2021, 362.7736], [497.2954, 350.0859], [504.4456, 342.1916], [514.77, 334.6975], [527.3573, 325.4929], [536.9893, 313.1041], [540.5679, 299.3723], [537.7455, 285.1886], [533.356, 274.5914], [531.7812, 263.9793], [533.1267, 254.7114], [536.5532, 245.1473], [536.5417, 238.4453], [531.2181, 230.5258], [522.2779, 224.6041], [511.7994, 221.0675], [506.341, 217.725], [504.0556, 215.4425], [501.8379, 215.209], [496.2083, 214.7189], [491.7082, 214.8229], [490.6353, 216.3463], [493.8458, 219.3714], [497.5232, 217.9637], [494.0149, 219.7406], [488.0893, 218.7645]]"
-# num_points = 10
-# iterations = 1000
+to run: navigate to this directory
+python3 dronesim_example.py
+"""
+import argparse
+import time
 
-# points = generate_relaxed_points(data_string, num_points, iterations)
+# import matplotlib.pyplot as plt
+import numpy as np
+import pybullet as p
+import json
+# from scipy.spatial import ConvexHull
+from dronesim.control.INDIControl import INDIControl
+from dronesim.envs.BaseAviary import DroneModel, Physics
+from dronesim.envs.CtrlAviary import CtrlAviary
+from dronesim.utils.Logger import Logger
+from dronesim.utils.utils import str2bool, sync
 
-# print(points)
+from pgflow import Cases
+from pgflow.arena import ArenaMap
+from pgflow.utils.simulation_utils import step_simulation, set_new_attribute
 
 
-import sys
-import ast
-from PyQt5 import QtWidgets, QtGui, QtCore
-from PlaceHomogeneousPointsInZone import generate_relaxed_points
 
-class PolygonDisplay(QtWidgets.QWidget):
-    def __init__(self, data_string, points):
-        super().__init__()
-        self.setWindowTitle("Polygon and Relaxed Points")
-        self.resize(800, 600)
+# at the moment, only convex buildings are supported for plotting
 
-        # Parse the data_string to get polygon_coords
-        try:
-            polygon_coords = ast.literal_eval(data_string)
-            if not isinstance(polygon_coords, list):
-                raise ValueError("Parsed data is not a list.")
-            self.polygon_points = [QtCore.QPointF(coords[0], coords[1]) for coords in polygon_coords]
-        except (SyntaxError, ValueError) as e:
-            QtWidgets.QMessageBox.critical(self, "Error", f"Invalid coordinate data: {e}")
-            self.polygon_points = []
-            return
+filename = 'voliere2.json' #case name from scenebuilder
+ArenaMap.size = 0.1
+ArenaMap.inflation_radius = 0.1
+case = Cases.get_case(filename, 'scenebuilder')
+# Load polygons from the text file
+with open(filename, "r") as f:
+    # Load the JSON data
+    data = json.load(f)
 
-        # Store the relaxed points
-        self.relaxed_points = [QtCore.QPointF(x, y) for x, y in points]
+num_drones = len(case.vehicle_list)
+case.mode = 'dynamics'
+case.building_detection_threshold = 1.5
+set_new_attribute(case, 'source_strength', 3)
+set_new_attribute(case, 'imag_source_strength', 5)
 
-        # Adjust the window size based on the polygon bounds
-        self.adjust_window_size()
-
-    def adjust_window_size(self):
-        # Calculate the bounding rectangle of the polygon
-        xs = [point.x() for point in self.polygon_points]
-        ys = [point.y() for point in self.polygon_points]
-        min_x, max_x = min(xs), max(xs)
-        min_y, max_y = min(ys), max(ys)
-        margin = 50  # Add some margin around the polygon
-
-        width = max_x - min_x + 2 * margin
-        height = max_y - min_y + 2 * margin
-
-        self.resize(int(width), int(height))
-
-        # Offset for centering the polygon in the window
-        self.x_offset = -min_x + margin
-        self.y_offset = -min_y + margin
-
-        # Apply offset to polygon points
-        self.polygon_points = [QtCore.QPointF(p.x() + self.x_offset, p.y() + self.y_offset) for p in self.polygon_points]
-        # Apply offset to relaxed points
-        self.relaxed_points = [QtCore.QPointF(p.x() + self.x_offset, p.y() + self.y_offset) for p in self.relaxed_points]
-
-    def paintEvent(self, event):
-        qp = QtGui.QPainter(self)
-        qp.setRenderHint(QtGui.QPainter.Antialiasing)
-        # Draw the polygon
-        if self.polygon_points:
-            pen = QtGui.QPen(QtCore.Qt.black, 2)
-            qp.setPen(pen)
-            qp.drawPolygon(QtGui.QPolygonF(self.polygon_points))
-
-        # Draw the relaxed points
-        if self.relaxed_points:
-            pen = QtGui.QPen(QtCore.Qt.blue)
-            brush = QtGui.QBrush(QtCore.Qt.blue)
-            qp.setPen(pen)
-            qp.setBrush(brush)
-            for point in self.relaxed_points:
-                qp.drawEllipse(point, 3, 3)
+target_speed = 0.5
+set_new_attribute(case, 'max_speed', target_speed)
 
 if __name__ == "__main__":
-    from PlaceHomogeneousPointsInZone import generate_relaxed_points
 
-    data_string = "[[373.1137, 114.1604], [371.8446, 109.2067], [365.2107, 111.1211], [358.9317, 113.6646], [349.6094, 116.1712], [337.3386, 114.4723], [321.368, 111.348], [311.154, 108.8157], [301.6672, 104.1241], [294.3586, 101.7708], [284.0513, 102.7553], [269.9465, 106.9397], [255.9055, 110.7102], [241.1849, 114.9598], [229.188, 116.5114], [215.9669, 116.8528], [202.7015, 125.4388], [194.1635, 137.4292], [188.4225, 154.1989], [182.8929, 169.9486], [180.3201, 186.0556], [174.3452, 201.0879], [166.1181, 216.2103], [155.8573, 230.9045], [147.907, 246.29], [140.8328, 262.0089], [136.477, 279.8167], [136.4165, 297.2284], [134.1736, 315.7289], [131.8721, 332.7748], [134.4662, 344.7558], [134.3878, 356.0133], [131.1751, 369.5604], [133.9034, 380.6879], [142.8212, 393.7831], [159.0959, 406.1145], [173.306, 419.035], [190.4665, 431.5323], [203.4956, 443.083], [215.8334, 454.3948], [228.913, 461.5452], [241.5366, 467.3407], [254.8916, 471.9225], [268.6401, 475.0311], [285.4601, 478.6144], [304.5397, 480.2299], [323.0768, 483.2185], [340.5895, 486.4331], [357.4611, 488.2809], [372.4318, 487.9362], [386.9002, 485.3282], [400.1117, 480.9183], [410.5583, 469.9876], [423.3351, 460.0084], [438.1455, 446.9809], [451.0481, 434.028], [461.1772, 423.9272], [467.4336, 415.4895], [472.5055, 406.7267], [478.1209, 396.4081], [483.8834, 377.9023], [490.2021, 362.7736], [497.2954, 350.0859], [504.4456, 342.1916], [514.77, 334.6975], [527.3573, 325.4929], [536.9893, 313.1041], [540.5679, 299.3723], [537.7455, 285.1886], [533.356, 274.5914], [531.7812, 263.9793], [533.1267, 254.7114], [536.5532, 245.1473], [536.5417, 238.4453], [531.2181, 230.5258], [522.2779, 224.6041], [511.7994, 221.0675], [506.341, 217.725], [504.0556, 215.4425], [501.8379, 215.209], [496.2083, 214.7189], [491.7082, 214.8229], [490.6353, 216.3463], [493.8458, 219.3714], [497.5232, 217.9637], [494.0149, 219.7406], [488.0893, 218.7645]]"
+    #### Define and parse (optional) arguments for the script ##
+    parser = argparse.ArgumentParser(
+        description="Helix flight script using CtrlAviary or VisionAviary and DSLPIDControl"
+    )
+    parser.add_argument(
+        "--drone",
+        default=["robobee"]*num_drones, #hexa_6DOF_simple
+        type=list,
+        help="Drone model (default: CF2X)",
+        metavar="",
+        choices=[DroneModel],
+    )
+    parser.add_argument(
+        "--num_drones",
+        default=1,
+        type=int,
+        help="Number of drones (default: 3)",
+        metavar="",
+    )
+    parser.add_argument(
+        "--physics",
+        default="pyb",
+        type=Physics,
+        help="Physics updates (default: PYB)",
+        metavar="",
+        choices=Physics,
+    )
+    parser.add_argument(
+        "--vision",
+        default=False,
+        type=str2bool,
+        help="Whether to use VisionAviary (default: False)",
+        metavar="",
+    )
+    parser.add_argument(
+        "--gui",
+        default=True,
+        type=str2bool,
+        help="Whether to use PyBullet GUI (default: True)",
+        metavar="",
+    )
+    parser.add_argument(
+        "--record_video",
+        default=False,
+        type=str2bool,
+        help="Whether to record a video (default: False)",
+        metavar="",
+    )
+    parser.add_argument(
+        "--plot",
+        default=True,
+        type=str2bool,
+        help="Whether to plot the simulation results (default: True)",
+        metavar="",
+    )
+    parser.add_argument(
+        "--user_debug_gui",
+        default=False,
+        type=str2bool,
+        help="Whether to add debug lines and parameters to the GUI (default: False)",
+        metavar="",
+    )
+    parser.add_argument(
+        "--aggregate",
+        default=True,
+        type=str2bool,
+        help="Whether to aggregate physics steps (default: True)",
+        metavar="",
+    )
+    parser.add_argument(
+        "--obstacles",
+        default=False,
+        type=str2bool,
+        help="Whether to add obstacles to the environment (default: True)",
+        metavar="",
+    )
+    parser.add_argument(
+        "--simulation_freq_hz",
+        default=240,
+        type=int,
+        help="Simulation frequency in Hz (default: 240)",
+        metavar="",
+    )
+    parser.add_argument(
+        "--control_freq_hz",
+        default=96,
+        type=int,
+        help="Control frequency in Hz (default: 48)",
+        metavar="",
+    )
+    parser.add_argument(
+        "--duration_sec",
+        default=20,
+        type=int,
+        help="Duration of the simulation in seconds (default: 5)",
+        metavar="",
+    )
+    ARGS = parser.parse_args()
 
-    num_points = 10
-    iterations = 1000
+    #### Initialize the simulation #############################
+    H = 0.50
+    H_STEP = 0.05
+    R = 2
 
-    # Generate the relaxed points
-    points = generate_relaxed_points(data_string, num_points, iterations)
+    AGGR_PHY_STEPS = (
+        int(ARGS.simulation_freq_hz / ARGS.control_freq_hz) if ARGS.aggregate else 1
+    )
 
-    # Create the application and display the window
-    app = QtWidgets.QApplication(sys.argv)
-    window = PolygonDisplay(data_string, points)
-    window.show()
-    sys.exit(app.exec_())
+    
+    ## Hover ###
+    # INIT_XYZS = np.array([[0.0, 0.0, 0.6]])
+    INIT_XYZS = np.array([v.position for v in case.vehicle_list])
+    rpy = [0.0, 0.0 * 3.14 / 180.0, 0.0 * 3.14 / 180.0]
+    INIT_RPYS = np.array([rpy for _ in range(num_drones)])
+    vel = [0.0, 0.0, 0.0]
+    INIT_VELS = np.array([vel for _ in range(num_drones)])
+
+    #### Initialize a circular trajectory ######################
+    PERIOD = 15
+    NUM_WP = ARGS.control_freq_hz * PERIOD
+
+    TARGET_POS = np.zeros((NUM_WP, 3))
+    for i in range(NUM_WP):
+        TARGET_POS[i, :] = (
+            R * np.cos((i / NUM_WP) * (4 * np.pi) + np.pi / 2) + INIT_XYZS[0, 0],
+            R * np.sin((i / NUM_WP) * (4 * np.pi) + np.pi / 2) - R + INIT_XYZS[0, 1],
+            0,
+        )
+
+    TARGET_RPYS = np.zeros((NUM_WP, 3))
+    for i in range(NUM_WP):
+        TARGET_RPYS[i, :] = [0.0, 0.0, 0.0]  # 0.4+(i*1./200)]
+
+    #### Create the environment ##
+    env = CtrlAviary(
+        drone_model=ARGS.drone,
+        num_drones=num_drones,
+        initial_xyzs=INIT_XYZS,
+        initial_vels=INIT_VELS,
+        initial_rpys=INIT_RPYS,
+        physics=ARGS.physics,
+        neighbourhood_radius=10,
+        freq=ARGS.simulation_freq_hz,
+        aggregate_phy_steps=AGGR_PHY_STEPS,
+        gui=ARGS.gui,
+        record=ARGS.record_video,
+        obstacles=ARGS.obstacles,
+        user_debug_gui=ARGS.user_debug_gui,
+    )
+
+    #### Obtain the PyBullet Client ID from the environment ####
+    PYB_CLIENT = env.getPyBulletClient()
+
+    
+
+    polygons = []
+    obstacles = data["scenebuilder"]["buildings"]
+    for id, obs in enumerate(obstacles): 
+        floor = np.array(obs["vertices"]).copy() 
+        floor[:,2] = 0.0
+        ceil = np.array(obs["vertices"]).copy() 
+        # ceil[:,2] = 3.0
+        
+        tmp = np.vstack((floor, ceil))
+        polygons.append(tmp)
+
+    # Create polygons in the simulation
+    for polygon_vertices in polygons:
+        polygon_id = p.createCollisionShape(p.GEOM_MESH, vertices=polygon_vertices)
+        p.createMultiBody(baseCollisionShapeIndex=polygon_id)
+
+
+  
+
+    #### Initialize the controllers ############################
+    ctrl = [INDIControl(drone_model=drone) for drone in ARGS.drone]
+
+    #### Run the simulation ####################################
+    CTRL_EVERY_N_STEPS = int(np.floor(env.SIM_FREQ / ARGS.control_freq_hz))
+    action = {
+        str(i): np.array([0.3, 0.3, 0.3, 0.3]) for i in range(num_drones)
+    }
+    # action = {'0': np.array([0.5,0.5,0.5,0.5,0.5,0.5])}# , '1': np.array([0.5,0.5,0.5,0.5])}
+    START = time.time()
+    for i in range(0, int(ARGS.duration_sec * env.SIM_FREQ), AGGR_PHY_STEPS):
+
+        #### Step the simulation ###################################
+        obs, reward, done, info = env.step(action)
+
+        for j in range(num_drones):
+            # print(f"{obs[str(j)]["state"]}")
+            pos = obs[str(j)]["state"][:3]
+            case.vehicle_list[j].position = pos
+        step_simulation(case)
+
+        #### Compute control at the desired frequency ##############
+        if i % CTRL_EVERY_N_STEPS == 0:
+            #### Compute control for the current way point #############
+            for j in range(num_drones):
+
+                vehicle = case.vehicle_list[j]
+                if vehicle.state==1:
+                    #Drone has arrived, send landing command
+                    desired_vector = np.array([0,0,-1])
+                else:
+                    desired_vector = vehicle.desired_vectors[-1]
+                    desired_vector = np.hstack([desired_vector, 0])
+
+               
+                ##### NOTE HERE IS WHERE YOU WOULD PUT YOUR TARGET VELOCITY FOR THE DRONES TO FOLLOW
+                action[str(j)], _, _ = ctrl[j].computeControlFromState(
+                        control_timestep=CTRL_EVERY_N_STEPS * env.TIMESTEP,
+                        state=obs[str(j)]["state"],
+                        target_pos = np.hstack([obs[str(j)]["state"][:2], 0.5]),
+                        target_vel=desired_vector*target_speed,
+                        # target_acc=np.zeros(3),
+                        target_rpy=np.array([0,0,np.arctan2(desired_vector[1], desired_vector[0])]),
+                        # target_rpy_rates=np.zeros(3),
+                    )
+         
+        #### Printout ##############################################
+        if i % env.SIM_FREQ == 0:
+            env.render()
+
+        #### Sync the simulation ###################################
+        if ARGS.gui:
+            sync(i, START, env.TIMESTEP)
+
+           #### Close the environment #################################
+    env.close()
+    case.to_dict('pybullet_output.json')
+
+ 
