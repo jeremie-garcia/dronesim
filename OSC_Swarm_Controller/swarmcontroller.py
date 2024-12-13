@@ -94,6 +94,8 @@ class SwarmController(QObject):
 
         self.rotation = [0.0 for _ in range(self.nb_of_drones)]
 
+        self.islaunching = False
+
         self.create_flying_sim()
 
         self.action = {
@@ -245,6 +247,20 @@ class SwarmController(QObject):
                 )
                 # Réinitialiser le vecteur désiré après son traitement
                 self.velocities[j] = {'vx': 0, 'vy': 0, 'vz': 0}
+
+            # For the launch, the drone goes up to the target height and only then goes to the target position
+            elif self.islaunching:
+                desired_vector = np.array([0, 0, 2])
+                self.action[str(j)], _, _ = self.ctrl[j].computeControlFromState(
+                    control_timestep=self.ctrl_every_n_steps * self.env.TIMESTEP,
+                    state=obs[str(j)]["state"],
+                    target_pos=np.hstack([obs[str(j)]["state"][:3]]),
+                    target_vel=desired_vector * TARGET_SPEED,
+                    target_rpy=np.array([0, 0, 0])
+                )
+                if obs[str(j)]["state"][2] > self.drone_targets[j][2]:
+                    self.islaunching = False 
+
             else:
                 vehicle = case.vehicle_list[j]
 
@@ -306,6 +322,7 @@ class SwarmController(QObject):
 
     def set_drone_state_to_launch(self):
         self.waiting_for_launch = False
+        self.islaunching = True
         for v in case.vehicle_list:
             v.state = 0
 
