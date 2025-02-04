@@ -4,6 +4,7 @@ import time
 import json
 import argparse
 import numpy as np
+from math import pi
 
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import QObject, QTimer
@@ -54,7 +55,7 @@ case.building_detection_threshold = 4  # Distance pour que les drones voient les
 case.max_avoidance_distance = 4  # Distance pour que les drones se voient entre eux (impact sur les performances) / conseil : 4
 set_new_attribute(case, 'source_strength', 1)  # Force de la source du véhicule (pas d'impact sur les performances)
 
-TARGET_SPEED = 2  # en m/s
+TARGET_SPEED = 4  # en m/s
 FPV_SPEED = 4  # Vitesse maximale plus élevée pour le FPV
 set_new_attribute(case, 'max_speed', TARGET_SPEED)  # Vitesse maximale pour les drones (pas d'impact sur les performances)
 
@@ -231,6 +232,8 @@ class SwarmController(QObject):
 
         # Calculer le contrôle pour le point de cheminement actuel
         for j in range(self.env.NUM_DRONES):
+
+            #print("drone number : ", j, " and state : ", case.vehicle_list[j].state)
             if j == self.drone_fpv_index:
                 # Si le drone est contrôlé en FPV
                 desired_vector = np.array([
@@ -261,7 +264,7 @@ class SwarmController(QObject):
                 if obs[str(j)]["state"][2] > self.drone_targets[j][2]:
                     self.islaunching = False 
 
-            else:
+            else :
                 vehicle = case.vehicle_list[j]
 
                 if self.waiting_for_launch :
@@ -280,7 +283,13 @@ class SwarmController(QObject):
                         target_pos = np.hstack([obs[str(j)]["state"][:2], obs[str(j)]["state"][2]])
 
                     target_vel = desired_vector * vehicle.max_speed
-                    target_rpy = [0, 0, np.arctan2(desired_vector[0], desired_vector[1])]
+                    if vehicle.state == 0: #update the rotation only if the drone is moving
+                        self.rotation[j] = np.arctan2(desired_vector[0], desired_vector[1])
+
+                    target_rpy = self.rotation[j] * np.array([0, 0, 1])
+
+                    #target_rpy = [0, 0, np.arctan2(desired_vector[1], desired_vector[0])]
+                    #target_rpy = [0, 0, pi]
                     # if j == 4:
                     #     print("Drone ", j)
                     #     print("target_pos : ", target_pos)

@@ -5,7 +5,7 @@ from shapely.geometry import Polygon, Point
 from shapely.validation import explain_validity
 from geovoronoi import voronoi_regions_from_coords
 
-def generate_relaxed_points(data_string, num_points=10, max_iterations=50, tol=1e-1):
+def generate_relaxed_points(data_string, num_points=10, max_iterations=30, tol=1e-1):
     """
     Generates relaxed points within a polygon defined by data_string using Lloyd's algorithm.
 
