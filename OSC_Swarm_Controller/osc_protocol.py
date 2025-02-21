@@ -37,6 +37,15 @@ SET_DRONE_ROTATION= "/set_drone_rotation"
 SET_DRONE_TARGET = "/set_drone_target"
 
 ###
+# OSC address for setting drone target
+# parameters: id, height
+# id: drone id
+# height : the target modification height
+# example: /set_drone_target [1, -5]
+###
+SET_DRONE_TARGET_HEIGHT = "/set_drone_target_height"
+
+###
 # OSC address for setting target to entire fleet
 # parameters: x, y, z
 # x, y, z: target position in world coordinates

@@ -77,6 +77,8 @@ class SwarmController(QObject):
 
         self.waiting_for_launch = True
 
+        self.currentState = 0
+
         self.env = None
         #self.nb_of_drones = 5
         self.vehicle_list = case.vehicle_list
@@ -211,6 +213,7 @@ class SwarmController(QObject):
 
         # Avancer la simulation
         obs, reward, done, info = self.env.step(self.action)
+        self.currentState = obs
 
         # Mettre à jour la cible des drones si une nouvelle cible est définie
         for i in range(self.nb_of_drones):
@@ -277,10 +280,18 @@ class SwarmController(QObject):
                     desired_vector = np.hstack([desired_vector, 0])
 
                     # Controler la hauteur du drone
-                    if obs[str(j)]["state"][2] < self.drone_targets[j][2]:
-                        target_pos = np.hstack([obs[str(j)]["state"][:2], obs[str(j)]["state"][2] + 1])
-                    else:
+                    # if obs[str(j)]["state"][2] < self.drone_targets[j][2]:
+                    #     target_pos = np.hstack([obs[str(j)]["state"][:2], obs[str(j)]["state"][2] + 1])
+                    # else:
+                    #     target_pos = np.hstack([obs[str(j)]["state"][:2], obs[str(j)]["state"][2]])
+
+                    if self.is_drone_on_height_target(j):
                         target_pos = np.hstack([obs[str(j)]["state"][:2], obs[str(j)]["state"][2]])
+                    elif obs[str(j)]["state"][2] < self.drone_targets[j][2]:
+                        target_pos = np.hstack([obs[str(j)]["state"][:2], obs[str(j)]["state"][2] + 2])
+                    elif obs[str(j)]["state"][2] > self.drone_targets[j][2]:
+                        target_pos = np.hstack([obs[str(j)]["state"][:2], obs[str(j)]["state"][2] - 2])
+
 
                     target_vel = desired_vector * vehicle.max_speed
                     if vehicle.state == 0: #update the rotation only if the drone is moving
@@ -290,14 +301,14 @@ class SwarmController(QObject):
 
                     #target_rpy = [0, 0, np.arctan2(desired_vector[1], desired_vector[0])]
                     #target_rpy = [0, 0, pi]
-                    # if j == 4:
-                    #     print("Drone ", j)
-                    #     print("target_pos : ", target_pos)
-                    #     print("target_vel : ", target_vel)
-                    #    print("target_rpy : ", target_rpy)
-                    #    print("desired_vector : ", desired_vector)
-                    #     print("obs state : ", obs[str(j)]["state"])
-                    #     print()
+                    # if j == 0:
+                        # print("Drone ", j)
+                        # print("target_pos : ", target_pos)
+                        # print("target_vel : ", target_vel)
+                        # print("target_rpy : ", target_rpy)
+                        # print("desired_vector : ", desired_vector)
+                        # print("obs state : ", obs[str(j)]["state"])
+                        # print()
 
                 # Calculer la commande de contrôle
                 self.action[str(j)], _, _ = self.ctrl[j].computeControlFromState(
@@ -334,6 +345,12 @@ class SwarmController(QObject):
         self.islaunching = True
         for v in case.vehicle_list:
             v.state = 0
+
+    def is_drone_on_height_target(self, i):
+        hieght = self.currentState[str(i)]["state"][2]
+        target_height = self.drone_targets[i][2]
+        # return true if height is less or more 3 than the target height
+        return hieght <= target_height + 3 and hieght >= target_height - 3
 
 
 if __name__ == "__main__":

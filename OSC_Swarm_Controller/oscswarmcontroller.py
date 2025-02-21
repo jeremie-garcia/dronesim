@@ -74,6 +74,9 @@ class OscSwarmController(SwarmController):
 
         elif addr == osc_protocol.SET_DRONE_TARGET:
             self.set_drone_target(data)
+
+        elif addr == osc_protocol.SET_DRONE_TARGET_HEIGHT:
+            self.modify_target_height(data)
         
         elif addr == osc_protocol.SET_FLEET_TARGET:
             self.set_fleet_target(data)
@@ -140,6 +143,16 @@ class OscSwarmController(SwarmController):
         if self.target_mode == 1: 
             self.vehicle_list[drone_id].state=0
         print("new target for drone", drone_id, ": ", xtarget, ytarget, ztarget)
+    
+    def modify_target_height(self, data_string):
+        data = self.to_array(data_string)
+        drone_id = int(data[0])
+        if (self.is_drone_on_height_target(drone_id)) :
+            height = float(data[1])
+            current_height = self.drone_targets[drone_id][2]
+            self.drone_targets[drone_id][2] = current_height + height
+            print("new target height for drone", drone_id, ": ", self.drone_targets[drone_id][2])
+
 
     def set_target_mode(self, data):
         mode = int(data[0])
