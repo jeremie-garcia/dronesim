@@ -90,12 +90,14 @@ class SwarmController(QObject):
         #self.initial_fleet_target = self.fleet_target.copy()
 
         self.velocities = {i: {'vx': 0, 'vy': 0, 'vz': 0} for i in range(self.nb_of_drones)}
+
         self.drone_fpv_index = -1
         self.action_strength = 1
 
         self.drone_model = ["robobee"] * self.nb_of_drones
 
         self.rotation = [0.0 for _ in range(self.nb_of_drones)]
+        self.rotation_delta = [0.0 for _ in range(self.nb_of_drones)]
 
         self.islaunching = False
 
@@ -297,7 +299,7 @@ class SwarmController(QObject):
                     if vehicle.state == 0: #update the rotation only if the drone is moving
                         self.rotation[j] = np.arctan2(desired_vector[0], desired_vector[1])
 
-                    target_rpy = self.rotation[j] * np.array([0, 0, 1])
+                    target_rpy = (self.rotation[j] + self.rotation_delta[j]) * np.array([0, 0, 1]) 
 
                     #target_rpy = [0, 0, np.arctan2(desired_vector[1], desired_vector[0])]
                     #target_rpy = [0, 0, pi]

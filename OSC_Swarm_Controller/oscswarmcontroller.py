@@ -69,6 +69,9 @@ class OscSwarmController(SwarmController):
         elif addr == osc_protocol.SET_DRONE_ROTATION:
             self.set_drone_rotation(data)
 
+        elif addr == osc_protocol.SET_DRONE_ROTATION_DELTA :
+            self.set_drone_rotation_delta(data)
+
         elif addr == osc_protocol.LAUNCH_DRONE:
             self.launch_drone()
 
@@ -117,6 +120,17 @@ class OscSwarmController(SwarmController):
             self.rotation[drone_id] -= 0.03 * rotationStrength
         elif direction == -1:
             self.rotation[drone_id] += 0.03 * rotationStrength
+
+    def set_drone_rotation_delta(self, data_string):
+        data = self.to_array(data_string)
+        drone_id = int(data[0])
+        direction = float(data[1])
+        rotationStrength = float(data[2])
+        if direction == 1:
+            self.rotation_delta[drone_id] = self.rotation_delta[drone_id] - rotationStrength * 0.03
+        elif direction == -1:
+            self.rotation_delta[drone_id] = self.rotation_delta[drone_id] + rotationStrength * 0.03
+        print("Drone ", drone_id, " rotation delta set to: ", self.rotation_delta[drone_id])
 
     def launch_drone(self):
         print("Take off drone")
