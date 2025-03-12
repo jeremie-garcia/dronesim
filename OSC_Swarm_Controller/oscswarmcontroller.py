@@ -1,6 +1,7 @@
 from pythonosc.udp_client import SimpleUDPClient
 
 import argparse
+import ast
 
 import osc_protocol
 from OSCServer import OSCServer, OSCThread
@@ -87,6 +88,9 @@ class OscSwarmController(SwarmController):
         elif addr == osc_protocol.SET_TARGET_MODE:
             self.set_target_mode(data)
 
+        elif addr == osc_protocol.SET_DRONE_TRAJECTORY:
+            self.set_drone_trajectory(data)
+
         elif addr == osc_protocol.RESET_TARGETS:
             self.reset_targets(data)
 
@@ -154,9 +158,39 @@ class OscSwarmController(SwarmController):
         ztarget = float(data[2])
         ytarget = float(data[3])
         self.drone_targets[drone_id] = [xtarget, ytarget, ztarget]
+        # Reset trajectory if target is set
+        if self.trajectory_drone[drone_id] != -1 :
+            self.trajectory_drone[drone_id] = -1
         if self.target_mode == 1: 
             self.vehicle_list[drone_id].state=0
         print("new target for drone", drone_id, ": ", xtarget, ytarget, ztarget)
+
+    def set_drone_trajectory(self, data_string):
+        data = self.to_array(data_string)
+        drone_id = int(data[0])
+        trajectory_str = data[1]
+        
+        try:
+            trajectory_str = trajectory_str.replace(';', ',')
+            trajectory_str = trajectory_str.replace('\'', '')
+            trajectory = ast.literal_eval(trajectory_str)
+        except Exception as e:
+            print("Error parsing string:", e)
+            trajectory = []
+            return
+
+        print("new trajectory for drone", drone_id, ": ", trajectory)
+        if self.drone_targets[drone_id][2] != 0 :
+            self.trajectory_drone[drone_id] = []
+            for i in range(len(trajectory)):
+                self.trajectory_drone[drone_id].append([trajectory[i][0], trajectory[i][1], self.drone_targets[drone_id][2]])
+        else:
+            self.trajectory_drone[drone_id] = trajectory
+        # Dernier point trajectoire = target + current height of drone
+        last_point = trajectory[-1]
+        self.drone_targets[drone_id] = [last_point[0], last_point[1], last_point[2]]
+        if self.target_mode == 1: 
+            self.vehicle_list[drone_id].state=0
     
     def modify_target_height(self, data_string):
         data = self.to_array(data_string)
@@ -165,6 +199,9 @@ class OscSwarmController(SwarmController):
             height = float(data[1])
             current_height = self.drone_targets[drone_id][2]
             self.drone_targets[drone_id][2] = current_height + height
+            if self.trajectory_drone[drone_id] != -1 :
+                for i in range(len(self.trajectory_drone[drone_id])):
+                    self.trajectory_drone[drone_id][i][2] += height
             print("new target height for drone", drone_id, ": ", self.drone_targets[drone_id][2])
 
 

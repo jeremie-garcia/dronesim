@@ -101,6 +101,8 @@ class SwarmController(QObject):
 
         self.islaunching = False
 
+        self.trajectory_drone = [-1 for _ in range(self.nb_of_drones)]
+
         self.create_flying_sim()
 
         self.action = {
@@ -221,7 +223,23 @@ class SwarmController(QObject):
         for i in range(self.nb_of_drones):
             vehicle = case.vehicle_list[i]
             if self.target_mode == 1 and self.is_individual_target_set(i):
-                vehicle.goal = self.drone_targets[i]
+                if self.trajectory_drone[i] != -1:
+                    if vehicle.arrived(5) : 
+                        #Retirer la premiere valeur de la liste des targets
+                        if len(self.trajectory_drone[i]) > 1:
+                            self.trajectory_drone[i] = self.trajectory_drone[i][1:]
+                            #print("new trajectory for drone", i, ": ", self.trajectory_drone[i])
+                        else:
+                            self.trajectory_drone[i] = -1
+                    
+                    if self.trajectory_drone[i] != -1:
+                        vehicle.goal = self.trajectory_drone[i][0]
+                    
+                    else :
+                        vehicle.goal = self.drone_targets[i]
+                
+                else:
+                    vehicle.goal = self.drone_targets[i]
             elif self.target_mode == 0 and self.is_fleet_target_set():
                 vehicle.goal = self.fleet_target
             else:

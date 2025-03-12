@@ -47,6 +47,14 @@ SET_DRONE_ROTATION_DELTA= "/set_drone_rotation_delta"
 SET_DRONE_TARGET = "/set_drone_target"
 
 ###
+# OSC address for setting drone trajectory
+# parameters: id,
+# id: drone id
+# 
+###
+SET_DRONE_TRAJECTORY = "/set_drone_trajectory"
+
+###
 # OSC address for setting drone target
 # parameters: id, height
 # id: drone id
