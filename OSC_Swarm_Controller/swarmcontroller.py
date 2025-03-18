@@ -231,6 +231,7 @@ class SwarmController(QObject):
                             #print("new trajectory for drone", i, ": ", self.trajectory_drone[i])
                         else:
                             self.trajectory_drone[i] = -1
+                            self.send_drone_end_trajectory(i)
                     
                     if self.trajectory_drone[i] != -1:
                         vehicle.goal = self.trajectory_drone[i][0]

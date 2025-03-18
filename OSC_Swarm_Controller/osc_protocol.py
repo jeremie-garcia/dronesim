@@ -131,3 +131,9 @@ SEND_DRONE_DATA = "/send_drone_data"
 # n: number of drones
 ###
 SEND_NUM_DRONES = "/send_num_drones"
+
+###
+# OSC address for sending when the drone end trajectory
+# parameters: id
+###
+DRONE_END_TRAJECTORY = "/send_end_trajectory"

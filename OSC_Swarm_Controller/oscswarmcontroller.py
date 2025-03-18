@@ -250,6 +250,9 @@ class OscSwarmController(SwarmController):
     def send_num_drones_via_osc(self):
         self.send_osc(osc_protocol.SEND_NUM_DRONES, [self.nb_of_drones])
 
+    def send_drone_end_trajectory(self, id):
+        self.send_osc(osc_protocol.DRONE_END_TRAJECTORY, [id])
+
     def stop_simulation(self):
         self.simulation_timer.stop()
         self.data_send_timer.stop()
