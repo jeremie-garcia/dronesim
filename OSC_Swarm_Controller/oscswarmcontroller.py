@@ -157,18 +157,25 @@ class OscSwarmController(SwarmController):
         xtarget = float(data[1])
         ztarget = float(data[2])
         ytarget = float(data[3])
-        self.drone_targets[drone_id] = [xtarget, ytarget, ztarget]
+        if self.drone_targets[drone_id][2] != 0 :
+            print("target already set")
+            self.drone_targets[drone_id] = [float(xtarget), float(ytarget), self.drone_targets[drone_id][2]]
+        else:  
+            print("no target already set")
+            self.drone_targets[drone_id] = [float(xtarget), float(ytarget), float(ztarget)]
+        self.rotation_delta[drone_id] = 0
         # Reset trajectory if target is set
         if self.trajectory_drone[drone_id] != -1 :
             self.trajectory_drone[drone_id] = -1
         if self.target_mode == 1: 
             self.vehicle_list[drone_id].state=0
-        print("new target for drone", drone_id, ": ", xtarget, ytarget, ztarget)
+        print("new target for drone", drone_id, ": ", self.drone_targets[drone_id])
 
     def set_drone_trajectory(self, data_string):
         data = self.to_array(data_string)
         drone_id = int(data[0])
         trajectory_str = data[1]
+        self.rotation_delta[drone_id] = 0
         
         try:
             trajectory_str = trajectory_str.replace(';', ',')
@@ -183,11 +190,13 @@ class OscSwarmController(SwarmController):
         if self.drone_targets[drone_id][2] != 0 :
             self.trajectory_drone[drone_id] = []
             for i in range(len(trajectory)):
-                self.trajectory_drone[drone_id].append([trajectory[i][0], trajectory[i][1], self.drone_targets[drone_id][2]])
+                self.trajectory_drone[drone_id].append([float(trajectory[i][0]), float(trajectory[i][1]), self.drone_targets[drone_id][2]])
         else:
             self.trajectory_drone[drone_id] = trajectory
+
+        print("new trajectory for drone after modifying height", drone_id, ": ", self.trajectory_drone[drone_id])
         # Dernier point trajectoire = target + current height of drone
-        last_point = trajectory[-1]
+        last_point = self.trajectory_drone[drone_id][-1]
         self.drone_targets[drone_id] = [last_point[0], last_point[1], last_point[2]]
         if self.target_mode == 1: 
             self.vehicle_list[drone_id].state=0

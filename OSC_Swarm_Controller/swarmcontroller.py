@@ -308,9 +308,9 @@ class SwarmController(QObject):
                     if self.is_drone_on_height_target(j):
                         target_pos = np.hstack([obs[str(j)]["state"][:2], obs[str(j)]["state"][2]])
                     elif obs[str(j)]["state"][2] < self.drone_targets[j][2]:
-                        target_pos = np.hstack([obs[str(j)]["state"][:2], obs[str(j)]["state"][2] + 2])
+                        target_pos = np.hstack([obs[str(j)]["state"][:2], obs[str(j)]["state"][2] + 5])
                     elif obs[str(j)]["state"][2] > self.drone_targets[j][2]:
-                        target_pos = np.hstack([obs[str(j)]["state"][:2], obs[str(j)]["state"][2] - 2])
+                        target_pos = np.hstack([obs[str(j)]["state"][:2], obs[str(j)]["state"][2] - 5])
 
 
                     target_vel = desired_vector * vehicle.max_speed
@@ -367,10 +367,10 @@ class SwarmController(QObject):
             v.state = 0
 
     def is_drone_on_height_target(self, i):
-        hieght = self.currentState[str(i)]["state"][2]
+        height = self.currentState[str(i)]["state"][2]
         target_height = self.drone_targets[i][2]
         # return true if height is less or more 3 than the target height
-        return hieght <= target_height + 3 and hieght >= target_height - 3
+        return height <= target_height + 3 and height >= target_height - 3
 
 
 if __name__ == "__main__":
