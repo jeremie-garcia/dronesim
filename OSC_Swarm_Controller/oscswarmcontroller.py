@@ -97,6 +97,12 @@ class OscSwarmController(SwarmController):
         elif addr == osc_protocol.SET_ZONE:
             self.set_zone(data)
 
+        elif addr == osc_protocol.SET_PAUSE_DRONE :
+            self.set_pause_drone(data)
+        
+        elif addr == osc_protocol.SET_PLAY_DRONE :
+            self.set_play_drone(data)
+
         elif addr == osc_protocol.EXIT_FPV_MODE:  # command sent when the user quits FPV on the current selected drone
             self.drone_fpv_index = -1
 
@@ -134,7 +140,7 @@ class OscSwarmController(SwarmController):
             self.rotation_delta[drone_id] = self.rotation_delta[drone_id] - rotationStrength * 0.03
         elif direction == -1:
             self.rotation_delta[drone_id] = self.rotation_delta[drone_id] + rotationStrength * 0.03
-        print("Drone ", drone_id, " rotation delta set to: ", self.rotation_delta[drone_id])
+        # print("Drone ", drone_id, " rotation delta set to: ", self.rotation_delta[drone_id])
 
     def launch_drone(self):
         print("Take off drone")
@@ -158,7 +164,7 @@ class OscSwarmController(SwarmController):
         ztarget = float(data[2])
         ytarget = float(data[3])
         if self.drone_targets[drone_id][2] != 0 :
-            print("target already set")
+            # print("target already set")
             self.drone_targets[drone_id] = [float(xtarget), float(ytarget), self.drone_targets[drone_id][2]]
         else:  
             print("no target already set")
@@ -194,7 +200,7 @@ class OscSwarmController(SwarmController):
         else:
             self.trajectory_drone[drone_id] = trajectory
 
-        print("new trajectory for drone after modifying height", drone_id, ": ", self.trajectory_drone[drone_id])
+        # print("new trajectory for drone after modifying height", drone_id, ": ", self.trajectory_drone[drone_id])
         # Dernier point trajectoire = target + current height of drone
         last_point = self.trajectory_drone[drone_id][-1]
         self.drone_targets[drone_id] = [last_point[0], last_point[1], last_point[2]]
@@ -211,7 +217,7 @@ class OscSwarmController(SwarmController):
             if self.trajectory_drone[drone_id] != -1 :
                 for i in range(len(self.trajectory_drone[drone_id])):
                     self.trajectory_drone[drone_id][i][2] += height
-            print("new target height for drone", drone_id, ": ", self.drone_targets[drone_id][2])
+            # print("new target height for drone", drone_id, ": ", self.drone_targets[drone_id][2])
 
 
     def set_target_mode(self, data):
@@ -227,6 +233,16 @@ class OscSwarmController(SwarmController):
             self.drone_targets[i] = self.initial_drone_targets[i]
         self.fleet_target = self.initial_fleet_target
         print("targets reset")
+    
+    def set_pause_drone(self, data_string) :
+        data = self.to_array(data_string)
+        id_drone = int(data[0])
+        self.pause_state[id_drone] = 1
+
+    def set_play_drone(self, data_string) :
+        data = self.to_array(data_string)
+        id_drone = int(data[0])
+        self.pause_state[id_drone] = 0
 
     def to_array(self, data):
         data = data[1:-1]

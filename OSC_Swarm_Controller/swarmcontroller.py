@@ -98,7 +98,9 @@ class SwarmController(QObject):
 
         self.rotation = [0.0 for _ in range(self.nb_of_drones)]
         self.rotation_delta = [0.0 for _ in range(self.nb_of_drones)]
-
+        
+        # Si state sur 0 : fonctionement normal / 1 : drone en mode pause
+        self.pause_state = [0 for _ in range(self.nb_of_drones)]
         self.islaunching = False
 
         self.trajectory_drone = [-1 for _ in range(self.nb_of_drones)]
@@ -274,6 +276,17 @@ class SwarmController(QObject):
                 )
                 # Réinitialiser le vecteur désiré après son traitement
                 self.velocities[j] = {'vx': 0, 'vy': 0, 'vz': 0}
+            
+            # Si le drone est en pause on lui met un vecteur nul
+            elif self.pause_state[j] == 1 :
+                desired_vector = np.array([0, 0, 0])
+                self.action[str(j)], _, _ = self.ctrl[j].computeControlFromState(
+                    control_timestep=self.ctrl_every_n_steps * self.env.TIMESTEP,
+                    state=obs[str(j)]["state"],
+                    target_pos=np.hstack([obs[str(j)]["state"][:3]]),
+                    target_vel=desired_vector * FPV_SPEED * self.action_strength,
+                    target_rpy=self.rotation[j] * np.array([0, 0, 1])
+                )
 
             # For the launch, the drone goes up to the target height and only then goes to the target position
             elif self.islaunching:

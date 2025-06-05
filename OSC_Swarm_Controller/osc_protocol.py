@@ -109,6 +109,18 @@ SET_ZONE = "/set_zone"
 ###
 SET_TARGETS_IN_ZONE = "/set_targets_in_zone"
 
+###
+# OSC address for make pause on one drone
+# parameter : id of the drone
+###
+SET_PAUSE_DRONE = "/set_pause_drone"
+
+###
+# OSC address for make pause on one drone
+# parameter : id of the drone
+###
+SET_PLAY_DRONE = "/set_play_drone"
+
 
 
 
