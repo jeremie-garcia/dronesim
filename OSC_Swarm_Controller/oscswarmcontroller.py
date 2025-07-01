@@ -180,6 +180,7 @@ class OscSwarmController(SwarmController):
     def set_drone_trajectory(self, data_string):
         data = self.to_array(data_string)
         drone_id = int(data[0])
+        self.is_first_traj_point_reached[drone_id] = False
         trajectory_str = data[1]
         self.rotation_delta[drone_id] = 0
         
@@ -268,6 +269,9 @@ class OscSwarmController(SwarmController):
 
     def send_drone_end_trajectory(self, id):
         self.send_osc(osc_protocol.DRONE_END_TRAJECTORY, [id])
+
+    def send_drone_reached_first_point_trajectory(self, id):
+        self.send_osc(osc_protocol.DRONE_REACHED_FIRST_POINT_TRAJ, [id])
 
     def stop_simulation(self):
         self.simulation_timer.stop()
