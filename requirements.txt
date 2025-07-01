@@ -6,7 +6,7 @@ scipy~=1.11.3
 matplotlib~=3.8.1
 cycler~=0.12.1
 setuptools~=68.2.2
-PyQt6
+pyqt6
 pyqt6-tools
 python-osc~=1.8.3
 pgflow
