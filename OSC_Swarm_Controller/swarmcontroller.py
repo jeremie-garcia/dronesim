@@ -1,15 +1,10 @@
+import json
 import os
 import sys
-import time
-import json
-import argparse
-import numpy as np
-from math import pi
-
-from PyQt6.QtWidgets import QApplication
-from PyQt6.QtCore import QObject, QTimer
 
 import pybullet as p
+from PyQt6.QtCore import QObject, QTimer
+from PyQt6.QtWidgets import QApplication
 
 # Ajuster le chemin pour inclure le package 'dronesim'
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -18,10 +13,9 @@ dronesim_path = os.path.join(grandparent_dir, "dronesim")
 sys.path.insert(0, dronesim_path)
 
 from dronesim.control.INDIControl import INDIControl
-from dronesim.envs.BaseAviary import DroneModel, Physics
+from dronesim.envs.BaseAviary import Physics
 from dronesim.envs.CtrlAviary import CtrlAviary
 from dronesim.utils.trajGen import *  # Considérez l'importation explicite des fonctions nécessaires
-from dronesim.utils.utils import str2bool
 
 from pgflow import Cases, vehicle
 from pgflow.arena import ArenaMap
