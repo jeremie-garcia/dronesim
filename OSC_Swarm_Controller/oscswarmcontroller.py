@@ -271,6 +271,7 @@ class OscSwarmController(SwarmController):
         self.send_osc(osc_protocol.DRONE_END_TRAJECTORY, [id])
 
     def send_drone_reached_first_point_trajectory(self, id):
+        print("drone on first point of its trajectory")
         self.send_osc(osc_protocol.DRONE_REACHED_FIRST_POINT_TRAJ, [id])
 
     def stop_simulation(self):
