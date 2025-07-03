@@ -98,6 +98,7 @@ class SwarmController(QObject):
         self.islaunching = False
 
         self.trajectory_drone = [-1 for _ in range(self.nb_of_drones)]
+        self.is_first_traj_point_reached = [False for _ in range(self.nb_of_drones)]
 
         self.create_flying_sim()
 
@@ -221,10 +222,14 @@ class SwarmController(QObject):
             if self.target_mode == 1 and self.is_individual_target_set(i):
                 if self.trajectory_drone[i] != -1:
                     if vehicle.arrived(5) : 
+                        if not self.is_first_traj_point_reached[i] :
+                            self.send_drone_reached_first_point_trajectory(i)
+                            self.is_first_traj_point_reached[i] = True 
+                            # should send a osc message to tell the drone is on the first point of the trajectory --> Then pause it from the FSM
+                            # When assigning new trajectory : make this value on False again and turn it to True when sending the OSC Message
                         #Retirer la premiere valeur de la liste des targets
                         if len(self.trajectory_drone[i]) > 1:
                             self.trajectory_drone[i] = self.trajectory_drone[i][1:]
-                            #print("new trajectory for drone", i, ": ", self.trajectory_drone[i])
                         else:
                             self.trajectory_drone[i] = -1
                             self.send_drone_end_trajectory(i)

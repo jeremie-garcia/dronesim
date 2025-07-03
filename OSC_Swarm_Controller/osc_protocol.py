@@ -149,3 +149,9 @@ SEND_NUM_DRONES = "/send_num_drones"
 # parameters: id
 ###
 DRONE_END_TRAJECTORY = "/send_end_trajectory"
+
+###
+# OSC address for sending when the drone reached the first point of the trajectory
+# parameters: id
+###
+DRONE_REACHED_FIRST_POINT_TRAJ = "/send_reached_first_point_trajectory"
