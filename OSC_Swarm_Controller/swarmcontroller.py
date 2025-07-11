@@ -271,7 +271,7 @@ class SwarmController(QObject):
                     state=obs[str(j)]["state"],
                     target_pos=np.hstack([obs[str(j)]["state"][:3]]),
                     target_vel=desired_vector * FPV_SPEED * self.action_strength,
-                    target_rpy=self.rotation[j] * np.array([0, 0, 1])
+                    target_rpy=(self.rotation[j] + self.rotation_delta[j]) * np.array([0, 0, 1]) 
                 )
                 # Réinitialiser le vecteur désiré après son traitement
                 self.velocities[j] = {'vx': 0, 'vy': 0, 'vz': 0}
@@ -284,7 +284,7 @@ class SwarmController(QObject):
                     state=obs[str(j)]["state"],
                     target_pos=np.hstack([obs[str(j)]["state"][:3]]),
                     target_vel=desired_vector * FPV_SPEED * self.action_strength,
-                    target_rpy=self.rotation[j] * np.array([0, 0, 1])
+                    target_rpy=(self.rotation[j] + self.rotation_delta[j]) * np.array([0, 0, 1]) 
                 )
 
             # For the launch, the drone goes up to the target height and only then goes to the target position
