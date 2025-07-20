@@ -92,6 +92,9 @@ class SwarmController(QObject):
 
         self.rotation = [0.0 for _ in range(self.nb_of_drones)]
         self.rotation_delta = [0.0 for _ in range(self.nb_of_drones)]
+        self.velocity_strength_per_drone = [1 for _ in range(self.nb_of_drones)]
+        
+        self.currentmodedrone = [0.0 for _ in range(self.nb_of_drones)] # 0 for target mode / 1 for trajectory mode / 2 for FPV mode / 3 for pause (diff de arrivé sur la target)
         
         # Si state sur 0 : fonctionement normal / 1 : drone en mode pause
         self.pause_state = [0 for _ in range(self.nb_of_drones)]
@@ -221,6 +224,7 @@ class SwarmController(QObject):
             vehicle = case.vehicle_list[i]
             if self.target_mode == 1 and self.is_individual_target_set(i):
                 if self.trajectory_drone[i] != -1:
+                    self.currentmodedrone[i] = 1
                     if vehicle.arrived(5) : 
                         if not self.is_first_traj_point_reached[i] :
                             self.send_drone_reached_first_point_trajectory(i)
@@ -239,9 +243,11 @@ class SwarmController(QObject):
                     
                     else :
                         vehicle.goal = self.drone_targets[i]
+                        self.currentmodedrone[i] = 0
                 
                 else:
                     vehicle.goal = self.drone_targets[i]
+                    self.currentmodedrone[i] = 0
             elif self.target_mode == 0 and self.is_fleet_target_set():
                 vehicle.goal = self.fleet_target
             else:
@@ -260,6 +266,7 @@ class SwarmController(QObject):
 
             #print("drone number : ", j, " and state : ", case.vehicle_list[j].state)
             if j == self.drone_fpv_index:
+                self.currentmodedrone[j] = 2
                 # Si le drone est contrôlé en FPV
                 desired_vector = np.array([
                     self.velocities[j]['vx'],
@@ -278,6 +285,7 @@ class SwarmController(QObject):
             
             # Si le drone est en pause on lui met un vecteur nul
             elif self.pause_state[j] == 1 :
+                self.currentmodedrone[j] = 3
                 desired_vector = np.array([0, 0, 0])
                 self.action[str(j)], _, _ = self.ctrl[j].computeControlFromState(
                     control_timestep=self.ctrl_every_n_steps * self.env.TIMESTEP,
@@ -289,6 +297,7 @@ class SwarmController(QObject):
 
             # For the launch, the drone goes up to the target height and only then goes to the target position
             elif self.islaunching:
+                self.currentmodedrone[j] = 0
                 desired_vector = np.array([0, 0, 2])
                 self.action[str(j)], _, _ = self.ctrl[j].computeControlFromState(
                     control_timestep=self.ctrl_every_n_steps * self.env.TIMESTEP,
@@ -326,7 +335,8 @@ class SwarmController(QObject):
                         target_pos = np.hstack([obs[str(j)]["state"][:2], obs[str(j)]["state"][2] - 5])
 
 
-                    target_vel = desired_vector * vehicle.max_speed
+                    target_vel = desired_vector * vehicle.max_speed * self.velocity_strength_per_drone[j]
+                    
                     if vehicle.state == 0: #update the rotation only if the drone is moving
                         self.rotation[j] = np.arctan2(desired_vector[0], desired_vector[1])
 
