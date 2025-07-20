@@ -224,6 +224,7 @@ class SwarmController(QObject):
             vehicle = case.vehicle_list[i]
             if self.target_mode == 1 and self.is_individual_target_set(i):
                 if self.trajectory_drone[i] != -1:
+                    vehicle.goal = self.trajectory_drone[i][0] #supprime le cas que le drone soit deja sur sa traj auquelm cas le goal est toujours le précédent
                     self.currentmodedrone[i] = 1
                     if vehicle.arrived(5) : 
                         if not self.is_first_traj_point_reached[i] :
