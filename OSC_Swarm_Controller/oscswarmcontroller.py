@@ -72,6 +72,9 @@ class OscSwarmController(SwarmController):
 
         elif addr == osc_protocol.SET_DRONE_ROTATION_DELTA :
             self.set_drone_rotation_delta(data)
+            
+        elif addr == osc_protocol.SET_DRONE_VELOCITY_STRENGTH :
+            self.set_drone_velocity_strength(data)
 
         elif addr == osc_protocol.LAUNCH_DRONE:
             self.launch_drone()
@@ -104,7 +107,11 @@ class OscSwarmController(SwarmController):
             self.set_play_drone(data)
 
         elif addr == osc_protocol.EXIT_FPV_MODE:  # command sent when the user quits FPV on the current selected drone
+            self.rotation_delta[self.drone_fpv_index] = 0
+            self.currentmodedrone[self.drone_fpv_index] = 0 #WARNING
             self.drone_fpv_index = -1
+            
+            
 
         elif addr == osc_protocol.DEBUG_MESSAGE:
             print("Debug message: ", data)
@@ -118,6 +125,7 @@ class OscSwarmController(SwarmController):
             self.velocities[id_drone]['vz'] = float(data[2])
             self.velocities[id_drone]['vy'] = float(data[3])
             self.drone_fpv_index = id_drone
+            self.currentmodedrone[id_drone] = 2
             # print("Drone ", id_drone, " velocities set to: ", self.velocities[id_drone])
         self.action_strength = float(data[4])
 
@@ -127,9 +135,9 @@ class OscSwarmController(SwarmController):
         direction = float(data[1])
         rotationStrength = float(data[2])
         if direction == 1:
-            self.rotation[drone_id] -= 0.03 * rotationStrength
+            self.rotation[drone_id] -= 0.02 * rotationStrength
         elif direction == -1:
-            self.rotation[drone_id] += 0.03 * rotationStrength
+            self.rotation[drone_id] += 0.02 * rotationStrength
 
     def set_drone_rotation_delta(self, data_string):
         data = self.to_array(data_string)
@@ -137,10 +145,17 @@ class OscSwarmController(SwarmController):
         direction = float(data[1])
         rotationStrength = float(data[2])
         if direction == 1:
-            self.rotation_delta[drone_id] = self.rotation_delta[drone_id] - rotationStrength * 0.03
+            self.rotation_delta[drone_id] = self.rotation_delta[drone_id] - rotationStrength * 0.02
         elif direction == -1:
-            self.rotation_delta[drone_id] = self.rotation_delta[drone_id] + rotationStrength * 0.03
+            self.rotation_delta[drone_id] = self.rotation_delta[drone_id] + rotationStrength * 0.02
         # print("Drone ", drone_id, " rotation delta set to: ", self.rotation_delta[drone_id])
+        
+        
+    def set_drone_velocity_strength(self, data_string) :
+        data = self.to_array(data_string)
+        drone_id = int(data[0])
+        velocity_strength = int(data[1])
+        self.velocity_strength_per_drone[drone_id] = velocity_strength
 
     def launch_drone(self):
         print("Take off drone")
@@ -262,7 +277,8 @@ class OscSwarmController(SwarmController):
             self.send_osc(osc_protocol.SEND_DRONE_DATA, [i, self.env.pos[i, 0], self.env.pos[i, 1], self.env.pos[i, 2],
                                                          self.env.rpy[i, 0],
                                                          self.env.rpy[i, 1],
-                                                         self.env.rpy[i, 2]])
+                                                         self.env.rpy[i, 2],
+                          self.currentmodedrone[i]])
             
     def send_num_drones_via_osc(self):
         self.send_osc(osc_protocol.SEND_NUM_DRONES, [self.nb_of_drones])

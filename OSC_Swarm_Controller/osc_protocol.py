@@ -31,11 +31,23 @@ SET_DRONE_ROTATION= "/set_drone_rotation"
 # OSC address for setting drone rotation delta
 # parameters: id, direction, actionStrength
 # id: drone id
+# strenght: 1 or 2
+# example: /set_velocity_strength [1, 2]
+###
+SET_DRONE_VELOCITY_STRENGTH= "/set_velocity_strength"
+
+
+###
+# OSC address for setting drone velocity factor
+# parameters: id, velocity_strengh
+# id: drone id
 # direction: 1 or -1, to rotate to the right or to the left
 # rotationStrength: to what extent the controller was pressed
 # example: /set_drone_rotation [1, 1, 0.626433]
 ###
 SET_DRONE_ROTATION_DELTA= "/set_drone_rotation_delta"
+
+
 
 ###
 # OSC address for setting drone target
