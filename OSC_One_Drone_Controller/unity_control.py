@@ -3,12 +3,12 @@ import os
 
 # Comment --> for debuging Amania Computer
 current_dir = os.path.dirname(os.path.abspath(__file__))
-grandparent_dir = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
+grandparent_dir = os.path.dirname(os.path.dirname(current_dir))
 dronesim_path = os.path.join(grandparent_dir, "dronesim")
 sys.path.insert(0, dronesim_path)
 
 import pybullet as p
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QMainWindow, QLabel
 from PyQt6.QtCore import QObject, QTimer
 
 import argparse
@@ -24,7 +24,7 @@ from dronesim.utils.Logger import Logger
 from dronesim.utils.trajGen import *
 from dronesim.utils.utils import str2bool, sync
 
-from osc_swarm_controller.OSCServer import OSCServer, OSCThread
+from OSCServer import OSCServer, OSCThread
 
 OSC_IP = "127.0.0.1"
 OSC_SWARM_CONTROLLER_PORT = 3000
@@ -32,11 +32,11 @@ OSC_REMOTE_CONTROLLER_PORT = 3001
 CONTROL_FREQ = 60  # in HZ
 CONTROL_RATE = int(1000 / CONTROL_FREQ)  # in ms
 
-OSC_SEND_FREQ = 60  # in Hz
+OSC_SEND_FREQ = 20  # in Hz
 OSC_SEND_RATE = int(1000 / OSC_SEND_FREQ)  # in ms
 
 OSC_SIMULATION_STEPS_TO_SEND = 10  # number of control steps to send data
-NB_OF_DRONES = 4
+NB_OF_DRONES = 1
 
 
 class OSC_Swarm_Controller(QObject):
@@ -53,21 +53,19 @@ class OSC_Swarm_Controller(QObject):
         self.osc_thread.start()
 
         print("OSC server started")
-
-        self.vx = 0
-        self.vy = 0
-        self.vz = 0
-
+        
         self.env = None
         self.NB_OF_DRONES = NB_OF_DRONES
+
+        self.neighbourhood_radius = 4
+        self.formation_2D = False
 
 
         self.create_flyingsim()
 
-        self.action = {str(i): np.array([self.vx, self.vy, self.vz, 0.1]) for i in range(self.NB_OF_DRONES)}
+        self.velocities = {i: {'vx': 0.0, 'vy': 0.0, 'vz': 0.0} for i in range(self.NB_OF_DRONES)}
 
-        
-        #print("simulation created")
+        self.action = {str(i): np.array([float(self.velocities[i]['vx']), float(self.velocities[i]['vy']), float(self.velocities[i]['vz']), 0.5]) for i in range(self.NB_OF_DRONES)}
 
         self.simulation_timer = QTimer()
         self.simulation_timer.timeout.connect(self.update_simulation)
@@ -83,31 +81,43 @@ class OSC_Swarm_Controller(QObject):
 
     # Method to handle incoming OSC data
     def handle_osc_data(self, addr, data):
-        # print("received data", addr, data)
-        if addr == "/vx":
-            self.vx = float(data)
-        elif addr == "/vy":
-            self.vy = float(data)
-        elif addr == '/vz':
-            self.vz = float(data)
-        elif addr == "/take_off":
-            self.vx = 0
-            self.vy = 0
-            self.vz = 1
+        parts = addr.split('/')
+        
+        if len(parts) == 3 and parts[1] == 'drone' and parts[2] in ['vx', 'vy', 'vz']:
+            axis = parts[2]
+            for id_drone in range(self.NB_OF_DRONES):
+                self.velocities[id_drone][axis] = data
+                
+        elif addr == "/drone/disperse" :
+            self.neighbourhood_radius += 0.5
+
+        elif addr == "/drone/gather":
+            if self.neighbourhood_radius >= 2:
+                self.neighbourhood_radius -= 0.5
+
+        elif addr == "/drone/take_off":
+            for i in range(self.NB_OF_DRONES):
+                self.velocities[i]['vz'] = 1
+                self.velocities[i]['vx'] = 0
+                self.velocities[i]['vy'] = 0
 
             def stop_up():
-                self.vz = 0
-                self.action = {str(i): np.array([self.vx, self.vy, self.vz, 0.1]) for i in range(self.ARGS.num_drones)}
+                for i in range(self.NB_OF_DRONES):
+                    self.velocities[i]['vz'] = 0
+                self.action = {str(i): np.array([float(self.velocities[i]['vx']), float(self.velocities[i]['vy']), float(self.velocities[i]['vz']), 0.5]) for i in range(self.NB_OF_DRONES)}
 
             QTimer.singleShot(500, stop_up)
-        elif addr == "/landing":
-            self.vx = 0
-            self.vy = 0
-            self.vz = -2
+
+        elif addr == "/drone/landing":
+
+            for i in range(self.NB_OF_DRONES):
+                self.velocities[i]['vz'] = -1
+                self.velocities[i]['vx'] = 0
+                self.velocities[i]['vy'] = 0
 
         # update the action to perform
-        self.action = {str(i): np.array([self.vx, self.vy, self.vz, 0.1]) for i in range(self.ARGS.num_drones)}
-        print("action", self.action)
+        self.action = {str(i): np.array([float(self.velocities[i]['vx']), float(self.velocities[i]['vy']), float(self.velocities[i]['vz']), 0.5]) for i in range(self.NB_OF_DRONES)}
+
 
     # Method to start the OSC server
     def start_osc_server(self):
@@ -154,7 +164,7 @@ class OSC_Swarm_Controller(QObject):
         )
         parser.add_argument(
             "--gui",
-            default=True,
+            default=False,
             type=str2bool,
             help="Whether to use PyBullet GUI (default: True)",
             metavar="",
@@ -215,10 +225,28 @@ class OSC_Swarm_Controller(QObject):
             help="Duration of the simulation in seconds (default: 5)",
             metavar="",
         )
+        parser.add_argument (
+            "--neighbourhood_radius",
+            default = 2,
+            type = float,
+            help = "Neighbourhood radius for the drones (default: 2)"
+        )
+        parser.add_argument(
+            "--formation_2D",
+            default=False,
+            type=str2bool,
+            help="Whether to use 2D formation (default: False)",
+        )
         ARGS = parser.parse_args()
 
         if ARGS.num_drones:
             self.NB_OF_DRONES = ARGS.num_drones
+
+        if ARGS.neighbourhood_radius:
+            self.neighbourhood_radius = ARGS.neighbourhood_radius
+        
+        if ARGS.formation_2D:
+            self.formation_2D = ARGS.formation_2D
 
         #### Initialize the simulation #############################
         H = 0.50
@@ -247,7 +275,7 @@ class OSC_Swarm_Controller(QObject):
             initial_xyzs=INIT_XYZS,
             initial_rpys=INIT_RPYS,
             physics=Physics.PYB,
-            neighbourhood_radius=10,
+            neighbourhood_radius=self.neighbourhood_radius ,
             freq=ARGS.simulation_freq_hz,
             aggregate_phy_steps=AGGR_PHY_STEPS,
             gui=ARGS.gui,
@@ -262,6 +290,7 @@ class OSC_Swarm_Controller(QObject):
     def update_simulation(self):
         #### Step the simulation ###################################
         obs, reward, done, info = self.env.step(self.action)
+        self.avoid_collisions_potential_fields(obs)
 
     def send_simulation_data_via_osc(self):
         for i in range(self.env.NUM_DRONES):
@@ -286,6 +315,57 @@ class OSC_Swarm_Controller(QObject):
         self.env.close()
 
     # EOF
+
+    def avoid_collisions_potential_fields(self, obs):
+        #reinitialize the velocities
+        self.velocities = {i: {'vx': 0.0, 'vy': 0.0, 'vz': 0.0} for i in range(self.NB_OF_DRONES)}
+
+        """Adjust the velocities of the drones using potential fields to avoid collisions."""
+        k_att = 0.1  # Attraction constant
+        k_rep = 0.8  # Repulsion constant
+        repulsion_radius = self.neighbourhood_radius
+
+        for i in range(self.NB_OF_DRONES):
+            if self.env.pos[i, 2] < 0.5:
+                continue
+            # Initialize forces
+            force_att = np.zeros(3)
+            force_rep = np.zeros(3)
+
+
+            #the goal position is the center of the swarm (average of all the drones)
+            goal_position = np.array(np.mean(self.env.pos, axis=0))
+
+            current_position = np.array([self.env.pos[i, 0], self.env.pos[i, 1], self.env.pos[i, 2]])
+            force_att = k_att * (goal_position - current_position)
+
+            for j in range(self.NB_OF_DRONES):
+                if i != j:
+                    pos_i = current_position
+                    pos_j = np.array([self.env.pos[j, 0], self.env.pos[j, 1], self.env.pos[j, 2]])
+
+                    # Calculate the distance between the drones
+                    distance = np.linalg.norm(pos_i - pos_j)
+                    if distance < repulsion_radius:
+                        # Calculate the repulsive force
+                        direction = pos_i - pos_j
+                        direction = direction / np.linalg.norm(direction)  # Normalize the direction vector
+                        force_rep += k_rep / (distance ** 2) * direction
+
+                    elif distance < repulsion_radius + 0.5 :
+                        force_att = 0
+
+            # Calculate the total force
+            total_force = force_att + force_rep
+
+            # Adjust the velocities based on the forces
+            self.velocities[i]['vx'] += total_force[0]
+            self.velocities[i]['vy'] += total_force[1]
+            if not self.formation_2D:
+                self.velocities[i]['vz'] += total_force[2]
+
+        self.action = {str(i): np.array([float(self.velocities[i]['vx']), float(self.velocities[i]['vy']), float(self.velocities[i]['vz']), 0.2]) for i in range(self.NB_OF_DRONES)}
+        return
 
 
 if __name__ == "__main__":

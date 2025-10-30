@@ -3,12 +3,13 @@ import os
 
 # Comment --> for debuging Amania Computer
 current_dir = os.path.dirname(os.path.abspath(__file__))
-grandparent_dir = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
-dronesim_path = os.path.join(grandparent_dir, "dronesim")
+dronesim_path = os.path.dirname(current_dir)
+#dronesim_path = os.path.join(grandparent_dir, "dronesim")
+print("path", dronesim_path)
 sys.path.insert(0, dronesim_path)
 
 import pybullet as p
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QMainWindow, QLabel
 from PyQt6.QtCore import QObject, QTimer
 
 import argparse
@@ -24,7 +25,7 @@ from dronesim.utils.Logger import Logger
 from dronesim.utils.trajGen import *
 from dronesim.utils.utils import str2bool, sync
 
-from osc_swarm_controller.OSCServer import OSCServer, OSCThread
+from OSCServer import OSCServer, OSCThread
 
 OSC_IP = "127.0.0.1"
 OSC_SWARM_CONTROLLER_PORT = 3000
@@ -36,7 +37,7 @@ OSC_SEND_FREQ = 60  # in Hz
 OSC_SEND_RATE = int(1000 / OSC_SEND_FREQ)  # in ms
 
 OSC_SIMULATION_STEPS_TO_SEND = 10  # number of control steps to send data
-NB_OF_DRONES = 4
+NB_OF_DRONES = 1
 
 
 class OSC_Swarm_Controller(QObject):
