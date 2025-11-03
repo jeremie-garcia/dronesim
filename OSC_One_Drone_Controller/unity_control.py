@@ -120,7 +120,7 @@ class OSC_Swarm_Controller(QObject):
         parser.add_argument("--num_drones", default=1, type=int)
         parser.add_argument("--physics", default="pyb", type=Physics)
         parser.add_argument("--vision", default=False, type=str2bool)
-        parser.add_argument("--gui", default=False, type=str2bool)
+        parser.add_argument("--gui", default=True, type=str2bool)
         parser.add_argument("--record_video", default=False, type=str2bool)
         parser.add_argument("--plot", default=False, type=str2bool)
         parser.add_argument("--user_debug_gui", default=False, type=str2bool)
