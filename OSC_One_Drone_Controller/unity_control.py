@@ -19,9 +19,11 @@ from pythonosc.udp_client import SimpleUDPClient
 from dronesim.control.INDIControl import INDIControl
 from dronesim.envs.BaseAviary import DroneModel, Physics
 from dronesim.envs.VelocityAviary import VelocityAviary
+from dronesim.envs.VelocityRotationAviary import VelocityRotationAviary
 from dronesim.utils.Logger import Logger
 from dronesim.utils.trajGen import *
 from dronesim.utils.utils import str2bool, sync
+from dronesim.envs.CtrlAviary import CtrlAviary
 
 from OSCServer import OSCServer, OSCThread
 
@@ -63,7 +65,8 @@ class OSC_Swarm_Controller(QObject):
 
         # --- Only one drone ---
         self.velocities = {'vx': 0.0, 'vy': 0.0, 'vz': 0.0}
-        self.action = {'0': np.array([0.0, 0.0, 0.0, 0.5])}
+        self.rotation = 0.0
+        self.action = {'0': np.array([0.0, 0.0, 0.0, 0.5, self.rotation])}
 
         self.simulation_timer = QTimer()
         self.simulation_timer.timeout.connect(self.update_simulation)
@@ -84,6 +87,7 @@ class OSC_Swarm_Controller(QObject):
             self.velocities['vy'] = float(data_array[2])
             self.velocities['vz'] = float(data_array[1])  # Unity coordinates y<->z
 
+
         elif addr == "/drone/take_off":
             self.velocities['vz'] = 1
             self.velocities['vx'] = 0
@@ -92,7 +96,7 @@ class OSC_Swarm_Controller(QObject):
             def stop_up():
                 self.velocities['vz'] = 0
                 self.action = {'0': np.array(
-                    [self.velocities['vx'], self.velocities['vy'], self.velocities['vz'], 0.5])}
+                    [self.velocities['vx'], self.velocities['vy'], self.velocities['vz'], 0.5, self.rotation])}
 
             QTimer.singleShot(500, stop_up)
 
@@ -103,7 +107,7 @@ class OSC_Swarm_Controller(QObject):
 
         # Update the action
         self.action = {'0': np.array(
-            [self.velocities['vx'], self.velocities['vy'], self.velocities['vz'], 0.5])}
+            [self.velocities['vx'], self.velocities['vy'], self.velocities['vz'], 0.5, self.rotation])}
 
     # Method to start the OSC server
     def start_osc_server(self):
@@ -140,7 +144,7 @@ class OSC_Swarm_Controller(QObject):
 
         AGGR_PHY_STEPS = int(ARGS.simulation_freq_hz / ARGS.control_freq_hz) if ARGS.aggregate else 1
 
-        self.env = VelocityAviary(
+        self.env = VelocityRotationAviary(
             drone_model=ARGS.num_drones * ARGS.drone,
             num_drones=1,
             initial_xyzs=INIT_XYZS,
@@ -159,17 +163,20 @@ class OSC_Swarm_Controller(QObject):
 
     def update_simulation(self):
         obs, reward, done, info = self.env.step(self.action)
+        self.velocities['vx'] = 0
+        self.velocities['vy'] = 0
+        self.velocities['vz'] = 0
         self.avoid_collisions_potential_fields(obs)
 
     def send_simulation_data_via_osc(self):
         # --- One drone only ---
         self.send_osc("/send_drone_data", [
             self.env.pos[0, 0],
-            self.env.pos[0, 2],
             self.env.pos[0, 1],
+            self.env.pos[0, 2],
             self.env.rpy[0, 0],
-            self.env.rpy[0, 2],
             self.env.rpy[0, 1],
+            self.env.rpy[0, 2],
         ])
 
     def start_simulation(self):
@@ -189,7 +196,18 @@ class OSC_Swarm_Controller(QObject):
                            'vy': self.velocities['vy'],
                            'vz': self.velocities['vz']}
         self.action = {'0': np.array(
-            [self.velocities['vx'], self.velocities['vy'], self.velocities['vz'], 0.2])}
+            [self.velocities['vx'], self.velocities['vy'], self.velocities['vz'], 0.2, self.rotation])}
+        # desired_vector = np.array([
+        #     self.velocities['vx'],
+        #     self.velocities['vy'],
+        #     self.velocities['vz']
+        # ])
+        # self.action[str(0)], _, _ = self.env.computeControlFromState(
+        #     state=obs["state"],
+        #     target_pos=np.hstack([obs["state"][:3]]),
+        #     target_vel=desired_vector,
+        #     target_rpy=self.rotation[j] * np.array([0, 0, 1])
+        # )
         return
 
 
