@@ -1,5 +1,6 @@
 import sys
 import os
+import math
 
 # Comment --> for debugging Amania Computer
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -87,6 +88,15 @@ class OSC_Swarm_Controller(QObject):
             self.velocities['vy'] = float(data_array[2])
             self.velocities['vz'] = float(data_array[1])  # Unity coordinates y<->z
 
+        elif addr == "/set_drone_rotation":
+            data_array = ast.literal_eval(data)
+            direction = data_array[0]
+            strength = data_array[1]
+            if direction == 1:
+                self.rotation = ((self.rotation - 0.0175 * strength + math.pi) % (2 * math.pi)) - math.pi
+            elif direction == -1:
+                self.rotation = ((self.rotation + 0.0175 * strength + math.pi) % (2 * math.pi)) - math.pi
+
 
         elif addr == "/drone/take_off":
             self.velocities['vz'] = 1
@@ -139,7 +149,7 @@ class OSC_Swarm_Controller(QObject):
         ARGS = parser.parse_args()
 
         #### Initialize the simulation for one drone ####
-        INIT_XYZS = np.array([[0, 0, 3]])
+        INIT_XYZS = np.array([[0, 0, 0.1]])
         INIT_RPYS = np.array([[0.0, 0.0, 0.0]])
 
         AGGR_PHY_STEPS = int(ARGS.simulation_freq_hz / ARGS.control_freq_hz) if ARGS.aggregate else 1
@@ -195,6 +205,7 @@ class OSC_Swarm_Controller(QObject):
         self.velocities = {'vx': self.velocities['vx'],
                            'vy': self.velocities['vy'],
                            'vz': self.velocities['vz']}
+        print(self.rotation)
         self.action = {'0': np.array(
             [self.velocities['vx'], self.velocities['vy'], self.velocities['vz'], 0.2, self.rotation])}
         # desired_vector = np.array([
