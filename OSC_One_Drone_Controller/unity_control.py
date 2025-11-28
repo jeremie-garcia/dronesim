@@ -91,7 +91,7 @@ class OSC_Swarm_Controller(QObject):
         elif addr == "/set_drone_rotation":
             data_array = ast.literal_eval(data)
             direction = data_array[0]
-            strength = data_array[1]
+            strength = data_array[1]/2  #make the strength on max 0.5 instead of 1 (do not rotate too fast)
             if direction == 1:
                 self.rotation = ((self.rotation - 0.0175 * strength + math.pi) % (2 * math.pi)) - math.pi
             elif direction == -1:
@@ -106,7 +106,7 @@ class OSC_Swarm_Controller(QObject):
             def stop_up():
                 self.velocities['vz'] = 0
                 self.action = {'0': np.array(
-                    [self.velocities['vx'], self.velocities['vy'], self.velocities['vz'], 0.5, self.rotation])}
+                    [self.velocities['vx'], self.velocities['vy'], self.velocities['vz'], 0.3, self.rotation])}
 
             QTimer.singleShot(500, stop_up)
 
@@ -117,7 +117,7 @@ class OSC_Swarm_Controller(QObject):
 
         # Update the action
         self.action = {'0': np.array(
-            [self.velocities['vx'], self.velocities['vy'], self.velocities['vz'], 0.5, self.rotation])}
+            [self.velocities['vx'], self.velocities['vy'], self.velocities['vz'], 0.3, self.rotation])}
 
     # Method to start the OSC server
     def start_osc_server(self):
@@ -205,7 +205,6 @@ class OSC_Swarm_Controller(QObject):
         self.velocities = {'vx': self.velocities['vx'],
                            'vy': self.velocities['vy'],
                            'vz': self.velocities['vz']}
-        print(self.rotation)
         self.action = {'0': np.array(
             [self.velocities['vx'], self.velocities['vy'], self.velocities['vz'], 0.2, self.rotation])}
         # desired_vector = np.array([
