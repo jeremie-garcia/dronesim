@@ -34,11 +34,12 @@ OSC_REMOTE_CONTROLLER_PORT = 3001
 CONTROL_FREQ = 60  # in HZ
 CONTROL_RATE = int(1000 / CONTROL_FREQ)  # in ms
 
-OSC_SEND_FREQ = 20  # in Hz
+OSC_SEND_FREQ = 40  # in Hz
 OSC_SEND_RATE = int(1000 / OSC_SEND_FREQ)  # in ms
 
 OSC_SIMULATION_STEPS_TO_SEND = 10
 NB_OF_DRONES = 1
+VELOCITY_STRENGTH = 1
 
 
 class OSC_Swarm_Controller(QObject):
@@ -106,7 +107,7 @@ class OSC_Swarm_Controller(QObject):
             def stop_up():
                 self.velocities['vz'] = 0
                 self.action = {'0': np.array(
-                    [self.velocities['vx'], self.velocities['vy'], self.velocities['vz'], 0.3, self.rotation])}
+                    [self.velocities['vx'], self.velocities['vy'], self.velocities['vz'], VELOCITY_STRENGTH, self.rotation])}
 
             QTimer.singleShot(500, stop_up)
 
@@ -117,7 +118,7 @@ class OSC_Swarm_Controller(QObject):
 
         # Update the action
         self.action = {'0': np.array(
-            [self.velocities['vx'], self.velocities['vy'], self.velocities['vz'], 0.3, self.rotation])}
+            [self.velocities['vx'], self.velocities['vy'], self.velocities['vz'], VELOCITY_STRENGTH, self.rotation])}
 
     # Method to start the OSC server
     def start_osc_server(self):
@@ -130,7 +131,7 @@ class OSC_Swarm_Controller(QObject):
         parser = argparse.ArgumentParser(
             description="Single drone flight script using VelocityAviary"
         )
-        parser.add_argument("--drone", default=["tello"], type=list)
+        parser.add_argument("--drone", default=["robobee"], type=list)
         parser.add_argument("--num_drones", default=1, type=int)
         parser.add_argument("--physics", default="pyb", type=Physics)
         parser.add_argument("--vision", default=False, type=str2bool)
@@ -145,11 +146,15 @@ class OSC_Swarm_Controller(QObject):
         parser.add_argument("--duration_sec", default=20000, type=int)
         parser.add_argument("--neighbourhood_radius", default=2, type=float)
         parser.add_argument("--formation_2D", default=False, type=str2bool)
+        parser.add_argument("--settings_listendrone", default=False, type=str2bool)
 
         ARGS = parser.parse_args()
 
         #### Initialize the simulation for one drone ####
-        INIT_XYZS = np.array([[0, 0, 0.1]])
+        if (ARGS.settings_listendrone):
+            INIT_XYZS = np.array([[-15, -60, 4]])
+        else:
+            INIT_XYZS = np.array([[0, 0, 0.1]])
         INIT_RPYS = np.array([[0.0, 0.0, 0.0]])
 
         AGGR_PHY_STEPS = int(ARGS.simulation_freq_hz / ARGS.control_freq_hz) if ARGS.aggregate else 1
@@ -206,7 +211,7 @@ class OSC_Swarm_Controller(QObject):
                            'vy': self.velocities['vy'],
                            'vz': self.velocities['vz']}
         self.action = {'0': np.array(
-            [self.velocities['vx'], self.velocities['vy'], self.velocities['vz'], 0.2, self.rotation])}
+            [self.velocities['vx'], self.velocities['vy'], self.velocities['vz'], VELOCITY_STRENGTH, self.rotation])}
         # desired_vector = np.array([
         #     self.velocities['vx'],
         #     self.velocities['vy'],
