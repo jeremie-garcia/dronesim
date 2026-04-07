@@ -242,10 +242,16 @@ class VelocityRotationAviary(BaseAviary):
             #### Get the current state of the drone  ###################
             state = self._getDroneStateVector(int(k))
             #### Normalize the first 3 components of the target velocity
-            if np.linalg.norm(v[0:3]) != 0:
+            if np.linalg.norm(v[0:3])>= 1 and np.linalg.norm(v[0:3]) != 0:
                 v_unit_vector = v[0:3] / np.linalg.norm(v[0:3])
+            elif np.linalg.norm(v[0:3])<1 and np.linalg.norm(v[0:3]) != 0:
+                v_unit_vector = v[0:3]
             else:
                 v_unit_vector = np.zeros(3)
+
+            # ### Compute the velocity depending on values of v[0:3]
+            # vel_cmd = np.linalg.norm(v[0:3])
+            # if vel_cmd > 1.0: vel_cmd = 1.0  # do not the velocity exceed 1
                 
             temp, _, _ = self.ctrl[int(k)].computeControl(
                 control_timestep=self.AGGR_PHY_STEPS * self.TIMESTEP,
@@ -254,7 +260,7 @@ class VelocityRotationAviary(BaseAviary):
                 cur_vel=state[10:13],
                 cur_ang_vel=state[13:16],
                 target_pos=state[0:3],  # same as the current position
-                target_rpy=np.array([0, 0, v[4]]), 
+                target_rpy=np.array([0, 0, v[4]]),
                 target_vel=self.SPEED_LIMIT[int(k)]
                 * np.abs(v[3])
                 * v_unit_vector,  # target the desired velocity vector

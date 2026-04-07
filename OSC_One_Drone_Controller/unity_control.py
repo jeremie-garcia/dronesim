@@ -131,7 +131,7 @@ class OSC_Swarm_Controller(QObject):
         parser = argparse.ArgumentParser(
             description="Single drone flight script using VelocityAviary"
         )
-        parser.add_argument("--drone", default=["robobee"], type=list)
+        parser.add_argument("--drone", default=["hexa_6DOF_simple"], type=list)
         parser.add_argument("--num_drones", default=1, type=int)
         parser.add_argument("--physics", default="pyb", type=Physics)
         parser.add_argument("--vision", default=False, type=str2bool)
@@ -152,7 +152,7 @@ class OSC_Swarm_Controller(QObject):
 
         #### Initialize the simulation for one drone ####
         if (ARGS.settings_listendrone):
-            INIT_XYZS = np.array([[-15, -60, 4]])
+            INIT_XYZS = np.array([[-265, -51, 0.5]])
         else:
             INIT_XYZS = np.array([[0, 0, 0.1]])
         INIT_RPYS = np.array([[0.0, 0.0, 0.0]])
@@ -181,7 +181,7 @@ class OSC_Swarm_Controller(QObject):
         self.velocities['vx'] = 0
         self.velocities['vy'] = 0
         self.velocities['vz'] = 0
-        self.avoid_collisions_potential_fields(obs)
+        self.avoid_collisions_potential_fields(obs) #if obstacle in the scene
 
     def send_simulation_data_via_osc(self):
         # --- One drone only ---

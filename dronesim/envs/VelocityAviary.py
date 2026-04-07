@@ -241,7 +241,7 @@ class VelocityAviary(BaseAviary):
         for k, v in action.items():
             #### Get the current state of the drone  ###################
             state = self._getDroneStateVector(int(k))
-            #### Normalize the first 3 components of the target velocity
+            #### Normalize the first 3 components of the target velocity to get the direction
             if np.linalg.norm(v[0:3]) != 0:
                 v_unit_vector = v[0:3] / np.linalg.norm(v[0:3])
             else:
