@@ -46,6 +46,8 @@ class OSC_Swarm_Controller(QObject):
     def __init__(self):
         super().__init__()
 
+        self.velocity_strength = 0.8
+
         self.ARGS = None
         self.osc_client = SimpleUDPClient(OSC_IP, OSC_REMOTE_CONTROLLER_PORT)
 
@@ -107,7 +109,7 @@ class OSC_Swarm_Controller(QObject):
             def stop_up():
                 self.velocities['vz'] = 0
                 self.action = {'0': np.array(
-                    [self.velocities['vx'], self.velocities['vy'], self.velocities['vz'], VELOCITY_STRENGTH, self.rotation])}
+                    [self.velocities['vx'], self.velocities['vy'], self.velocities['vz'], self.velocity_strength, self.rotation])}
 
             QTimer.singleShot(500, stop_up)
 
@@ -116,9 +118,14 @@ class OSC_Swarm_Controller(QObject):
             self.velocities['vx'] = 0
             self.velocities['vy'] = 0
 
+        elif addr == "/set_drone_speed":
+            data_array = ast.literal_eval(data)
+            print(f'set_drone_speed: {data_array[0]}')
+            self.velocity_strength = data_array[0]
+
         # Update the action
         self.action = {'0': np.array(
-            [self.velocities['vx'], self.velocities['vy'], self.velocities['vz'], VELOCITY_STRENGTH, self.rotation])}
+            [self.velocities['vx'], self.velocities['vy'], self.velocities['vz'], self.velocity_strength, self.rotation])}
 
     # Method to start the OSC server
     def start_osc_server(self):
@@ -152,7 +159,7 @@ class OSC_Swarm_Controller(QObject):
 
         #### Initialize the simulation for one drone ####
         if (ARGS.settings_listendrone):
-            INIT_XYZS = np.array([[-265, -51, 0.5]])
+            INIT_XYZS = np.array([[-265, -51, 1]])
         else:
             INIT_XYZS = np.array([[0, 0, 0.1]])
         INIT_RPYS = np.array([[0.0, 0.0, 0.0]])
@@ -211,7 +218,7 @@ class OSC_Swarm_Controller(QObject):
                            'vy': self.velocities['vy'],
                            'vz': self.velocities['vz']}
         self.action = {'0': np.array(
-            [self.velocities['vx'], self.velocities['vy'], self.velocities['vz'], VELOCITY_STRENGTH, self.rotation])}
+            [self.velocities['vx'], self.velocities['vy'], self.velocities['vz'], self.velocity_strength, self.rotation])}
         # desired_vector = np.array([
         #     self.velocities['vx'],
         #     self.velocities['vy'],
